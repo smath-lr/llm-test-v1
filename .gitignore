@@ -1,4 +1,16 @@
+# 密钥配置文件
 config/config.yaml
+
+# 日志目录（包含fail_payload下的json失败报文）
+logs/
+*.log
+
+# Python缓存
 __pycache__/
 *.pyc
-*.log
+
+# pytest缓存目录
+.pytest_cache/
+
+# VSCode编辑器本地配置
+.vscode/
