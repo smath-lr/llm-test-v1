@@ -14,3 +14,7 @@ __pycache__/
 
 # VSCode编辑器本地配置
 .vscode/
+
+# 报告产物
+allure-report/
+allure-results/

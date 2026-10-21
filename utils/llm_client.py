@@ -45,7 +45,7 @@ client = OpenAI(
 
 
 # ============ 核心调用 ============
-def chat(prompt, model=deepseek_cfg["model"], temperature=0.7, max_tokens=500):
+def chat(prompt, model=deepseek_cfg["model"], timeout=deepseek_cfg["timeout"], temperature=0.7, max_tokens=500):
     """
     【调用 DeepSeek，返回模型回复】统一对话入口，兼容两种入参
     :param prompt:
@@ -66,7 +66,8 @@ def chat(prompt, model=deepseek_cfg["model"], temperature=0.7, max_tokens=500):
         model=model,
         messages=messages,
         temperature=temperature,
-        max_tokens=max_tokens
+        max_tokens=max_tokens,
+        timeout=timeout
     )
 
     # API返回结果校验
