@@ -88,7 +88,7 @@ def pytest_runtest_makereport(item, call):
 
     prompt_len = payload_data["prompt_len"]
     resp_len = payload_data["response_len"]
-    expected_exception = payload_data.get("expected_exception")
+    expected_exception = payload_data["expected_exception"]
 
     if call.excinfo is not None:
         # 用例失败，保存json文件 + 输出错误日志+堆栈
