@@ -4,6 +4,7 @@ from utils.llm_client import chat
 
 
 # 用例1：真实请求deepseek，使用conftest里的fixture
+@pytest.mark.real_api
 def test_api_normal_response(valid_prompt, request):
     """使用fixture传入预设prompt，校验API返回数据类型是字符串"""
     res = chat(valid_prompt)
@@ -19,6 +20,7 @@ def test_api_normal_response(valid_prompt, request):
 
 
 # 用例2：mock模拟接口，**不联网，不消耗token**
+@pytest.mark.mock
 def test_api_empty_choices(mocker, valid_prompt, request):
     """mock：API返回空choices，预期抛出RuntimeError，不消耗token"""
     # mock底层openai的create方法，模拟返回空choices
@@ -39,6 +41,7 @@ def test_api_empty_choices(mocker, valid_prompt, request):
 
 
 #用例3：mock模拟服务500报错
+@pytest.mark.mock
 def test_api_500_error(mocker, valid_prompt, request):
     """mock：API服务500内部异常，预期抛出APIError，不联网"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")

@@ -1,7 +1,10 @@
+import pytest
 import yaml
 from pathlib import Path
 from utils.llm_client import chat
 
+
+@pytest.mark.real_api
 def test_full_end2end_flow(request):
     """完整端到端链路测试：配置加载 → prompt预处理 → API调用 → 返回断言"""
     # 1.加载yaml配置
@@ -27,6 +30,7 @@ def test_full_end2end_flow(request):
     assert "5" in res
 
 
+@pytest.mark.real_api
 def test_full_multi_turn_flow(request):
     """多轮对话端到端测试：验证模型上下文记忆能力"""
     # 1.加载yaml配置

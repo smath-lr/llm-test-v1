@@ -1,6 +1,8 @@
 import pytest
 from utils.llm_client import chat,MAX_PROMPT_LENGTH
 
+
+@pytest.mark.real_api
 @pytest.mark.parametrize("prompt, should_raise", [
     # ("",  True),                                # 边界：长度0
     ("a",  False),                               # 边界：长度1

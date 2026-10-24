@@ -1,8 +1,10 @@
 import pytest
 from utils.llm_client import chat,MAX_PROMPT_LENGTH
 
+
 # parametrize: 等价类测试
 # 一次性传入多组prompt，自动生成多条测试用例
+@pytest.mark.real_api
 @pytest.mark.parametrize("prompt, expect_valid", [
     # ===== 有效等价类 =====
     ("解释pytest是什么", True),                 # 有效：正常中文文本
