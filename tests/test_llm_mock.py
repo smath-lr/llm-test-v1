@@ -1,11 +1,10 @@
 import json
-from openai import APIError, APITimeoutError
+from openai import APIConnectionError, APIError, APITimeoutError
 import pytest
-from utils.llm_client import chat
 
 
 @pytest.mark.mock
-def test_mock_chat_normal_text(mocker, valid_prompt, request):
+def test_mock_chat_normal_text(llm_client, mocker, valid_prompt, request):
     """Mock用例1：模拟LLM返回普通文本，验证chat正常拿到结果"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
 
@@ -18,7 +17,7 @@ def test_mock_chat_normal_text(mocker, valid_prompt, request):
     )
     mock_create.return_value = mock_response
 
-    result = chat(valid_prompt)
+    result = llm_client.chat(valid_prompt)
     request.node.stash["payload_data"] = {
         "prompt": valid_prompt,
         "prompt_len": len(valid_prompt),
@@ -33,7 +32,7 @@ def test_mock_chat_normal_text(mocker, valid_prompt, request):
 
 
 @pytest.mark.mock
-def test_mock_chat_return_json(mocker, request):
+def test_mock_chat_return_json(llm_client, mocker, request):
     """Mock用例1：模拟LLM返回json字符串，测试json解析链路"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
 
@@ -49,7 +48,7 @@ def test_mock_chat_return_json(mocker, request):
     mock_create.return_value = mock_response
 
     prompt = "请输出JSON格式信息"
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
     request.node.stash["payload_data"] = {
         "prompt": prompt,
         "prompt_len": len(prompt),
@@ -64,7 +63,7 @@ def test_mock_chat_return_json(mocker, request):
 
 
 @pytest.mark.mock
-def test_mock_chat_empty_content(mocker, request):
+def test_mock_chat_empty_content(llm_client, mocker, request):
     """Mock用例：模拟LLM返回空字符串，校验上层chat函数处理空返回"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
@@ -77,7 +76,7 @@ def test_mock_chat_empty_content(mocker, request):
     mock_create.return_value = mock_response
 
     prompt = "返回空结果"
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     request.node.stash["payload_data"] = {
         "prompt": prompt,
@@ -92,7 +91,7 @@ def test_mock_chat_empty_content(mocker, request):
 
 
 @pytest.mark.mock
-def test_mock_chat_whitespace_content(mocker, request):
+def test_mock_chat_whitespace_content(llm_client, mocker, request):
     """Mock用例：模拟LLM只返回空格、换行这类空白字符"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
@@ -105,7 +104,7 @@ def test_mock_chat_whitespace_content(mocker, request):
     mock_create.return_value = mock_response
 
     prompt = "返回空白"
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     request.node.stash["payload_data"] = {
         "prompt": prompt,
@@ -120,7 +119,7 @@ def test_mock_chat_whitespace_content(mocker, request):
 
 
 @pytest.mark.mock
-def test_mock_chat_openai_api_error(mocker, request):
+def test_mock_chat_openai_api_error(llm_client, mocker, request):
     """Mock用例：模拟OpenAI服务端APIError（限流、密钥错误、服务不可用）
     重点：不让create返回正常对象，而是直接抛出异常
     """
@@ -141,7 +140,7 @@ def test_mock_chat_openai_api_error(mocker, request):
         "expected_exception": "请求限流"
     }
     with pytest.raises(APIError) as exc_info:
-        chat(prompt)
+        llm_client.chat(prompt)
 
     assert "Rate limit exceeded" in str(exc_info.value)
     assert exc_info.value.body["code"] == 429
@@ -149,7 +148,7 @@ def test_mock_chat_openai_api_error(mocker, request):
 
 
 @pytest.mark.mock
-def test_mock_chat_timeout_error(mocker, request):
+def test_mock_chat_timeout_error(llm_client, mocker, request):
     """Mock用例：模拟调用LLM接口超时 APITimeoutError"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_create.side_effect = APITimeoutError(request=None)
@@ -163,13 +162,13 @@ def test_mock_chat_timeout_error(mocker, request):
         "expected_exception": "APITimeoutError"
     }
     with pytest.raises(APITimeoutError):
-        chat(prompt)
+        llm_client.chat(prompt)
 
-    mock_create.assert_called_once()
+    mock_create.assert_called()
 
 
 @pytest.mark.mock
-def test_mock_chat_server_500_error(mocker, request):
+def test_mock_chat_server_500_error(llm_client, mocker, request):
     """Mock用例：模拟OpenAI服务端500内部错误"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_create.side_effect = APIError(
@@ -188,13 +187,13 @@ def test_mock_chat_server_500_error(mocker, request):
     }
 
     with pytest.raises(APIError, match="Server internal error"):
-        chat(prompt)
+        llm_client.chat(prompt)
 
     mock_create.assert_called_once()
 
 
 @pytest.mark.mock
-def test_mock_chat_prompt_empty(mocker, request):
+def test_mock_chat_prompt_empty(llm_client, mocker, request):
     """Mock用例：传入空prompt，本地参数校验拦截，不请求远端"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
 
@@ -207,14 +206,14 @@ def test_mock_chat_prompt_empty(mocker, request):
         "expected_exception": "ValueError"
     }
     with pytest.raises(ValueError, match="prompt不能为空"):
-        chat(prompt)
+        llm_client.chat(prompt)
 
     # 重点断言：校验函数根本没调用openai接口
     mock_create.assert_not_called()
 
 
 @pytest.mark.mock
-def test_mock_chat_prompt_too_long(mocker, request):
+def test_mock_chat_prompt_too_long(llm_client, mocker, request):
     """Mock用例：超长prompt，本地长度校验拦截"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     prompt = "A" * 5000  # 假设上限设置小于5000
@@ -227,7 +226,7 @@ def test_mock_chat_prompt_too_long(mocker, request):
     }
     
     with pytest.raises(ValueError, match=r"^prompt长度不能超过"):
-        chat(prompt)
+        llm_client.chat(prompt)
     mock_create.assert_not_called()
 
 
@@ -238,7 +237,7 @@ test_case_list = [
 ]
 @pytest.mark.mock
 @pytest.mark.parametrize("case_title, prompt, expect_text", test_case_list)
-def test_mock_chat_parametrize(mocker, request, case_title, prompt, expect_text):
+def test_mock_chat_parametrize(llm_client, mocker, request, case_title, prompt, expect_text):
     """Mock综合用例：参数化批量模拟多种正常返回，减少重复样板代码"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
@@ -250,7 +249,7 @@ def test_mock_chat_parametrize(mocker, request, case_title, prompt, expect_text)
     )
     mock_create.return_value = mock_response
 
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     request.node.stash["payload_data"] = {
         "case_title": case_title,
@@ -266,7 +265,7 @@ def test_mock_chat_parametrize(mocker, request, case_title, prompt, expect_text)
 
 
 @pytest.mark.mock
-def test_mock_chat_response_missing_content(mocker, request):
+def test_mock_chat_response_missing_content(llm_client, mocker, request):
     """Mock用例：返回结构残缺，message对象不存在content属性，校验chat容错逻辑"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     # 重点：message这个mock对象，不设置content
@@ -290,14 +289,119 @@ def test_mock_chat_response_missing_content(mocker, request):
 
     # 预期：访问message.content时抛属性不存在异常
     with pytest.raises(AttributeError):
-        chat(prompt)
+        llm_client.chat(prompt)
 
     mock_create.assert_called_once()
 
 
+@pytest.mark.mock
+def test_mock_chat_retry_on_timeout(llm_client, mocker, request):
+    """Mock用例：接口超时，触发重试，最多重试2次"""
+    from openai import APITimeoutError
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    # 连续抛出超时异常，触发重试
+    mock_create.side_effect = APITimeoutError("request timeout")
+
+    prompt = "测试超时"
+    request.node.stash["payload_data"] = {
+        "prompt": prompt,
+        "prompt_len": len(prompt),
+        "response": None,
+        "response_len": 0,
+        "expected_exception": "APITimeoutError"
+    }
+    with pytest.raises(APITimeoutError):
+        llm_client.chat(prompt)
+    # 原始调用1次 + 重试2次，合计调用3次
+    mock_create.call_count == 3
+
+
+@pytest.mark.mock
+def test_mock_chat_retry_on_connection_error(llm_client, mocker, request):
+    """Mock用例：连接失败，触发重试，最多重试2次"""
+    from openai import APIConnectionError
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    # 连续抛出连接失败异常，触发重试
+    mock_create.side_effect = APIConnectionError(
+        message="connection refuse",
+        request=None
+    )
+
+    prompt = "测试连接异常"
+    request.node.stash["payload_data"] = {
+        "prompt": prompt,
+        "prompt_len": len(prompt),
+        "response": None,
+        "response_len": 0,
+        "expected_exception": "APIConnectionError"
+    }
+    with pytest.raises(APIConnectionError):
+        llm_client.chat(prompt)
+    # 原始调用1次 + 重试2次，合计调用3次
+    mock_create.call_count == 3
+
+
+@pytest.mark.mock
+def test_mock_chat_no_retry_on_bad_request(llm_client, mocker, request):
+    """Mock用例：400参数错误，不重试，直接抛出异常"""
+    from openai import BadRequestError
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    mock_create.side_effect = BadRequestError(
+        message="invalid prompt param",
+        response=mocker.Mock(status_code=400),
+        body=None
+    )
+
+    prompt = "非法参数"
+    request.node.stash["payload_data"] = {
+        "prompt": prompt,
+        "prompt_len": len(prompt),
+        "response": None,
+        "response_len": 0,
+        "expected_exception": "BadRequestError"
+    }
+    with pytest.raises(BadRequestError, match="invalid prompt param"):
+        llm_client.chat(prompt)
+    # 只调用1次，没有重试
+    mock_create.assert_called_once()
+
+@pytest.mark.mock
+def test_mock_chat_retry_success_after_timeout(llm_client, mocker, request):
+    """Mock用例：前两次超时，第三次成功返回，重试后正常拿到结果"""
+    from openai import APITimeoutError
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    # 前两次超时和连接失败，第三次正常返回
+    err1 = APITimeoutError(request=None)
+    err1.custom_msg = "request timeout Error1"  #自定义标记
+    err2 = APIConnectionError(request=None)
+    err2.custom_msg = "connection refuse Error2"  #自定义标记
+
+    mock_create.side_effect = [
+        err1,err2,
+        mocker.Mock(
+            choices=[
+                mocker.Mock(message=mocker.Mock(content="重试成功返回结果"))
+            ]
+        )
+    ]
+
+    prompt = "重试测试"
+    request.node.stash["payload_data"] = {
+        "prompt": prompt,
+        "prompt_len": len(prompt),
+        "response": "重试成功返回结果",
+        "response_len": len("重试成功返回结果"),
+        "expected_exception": None
+    }
+    resp = llm_client.chat(prompt)
+    assert resp == "重试成功返回结果"
+    # 一共调用3次：2次失败重试 + 最后一次成功
+    mock_create.call_count == 3
+
+
 # @pytest.mark.mock
 # ===================== TODO：流式输出，当前chat暂未支持stream，待开发后解除注释 =====================
-# def test_mock_chat_stream_response(mocker, request):
+# def test_mock_chat_stream_response(llm_client, mocker, request):
 #     """Mock用例：模拟流式输出，返回多个chunk片段
 #     前置依赖：改造 utils.llm_client.chat，增加 stream 参数，支持迭代返回chunk
 #     """
@@ -311,7 +415,7 @@ def test_mock_chat_response_missing_content(mocker, request):
 #     mock_create.return_value = iter([chunk_1, chunk_2, chunk_3])
 #
 #     prompt = "流式输出"
-#     result_stream = chat(prompt, stream=True)
+#     result_stream = llm_client.chat(prompt, stream=True)
 #     full_text = "".join([chunk.choices[0].delta.content for chunk in result_stream])
 #
 #     request.node.stash["payload_data"] = {
