@@ -4,35 +4,18 @@ import pytest
 from pathlib import Path
 import time
 import json
+from config.config_loader import load_llm_config
+from utils import log_helper
+from utils.llm_client import LLMClient
+
 
 # 开启：logging内部handler发生IO错误时抛出异常，不要静默吞掉
 logging.raiseExceptions = True
 # 记录已经打印模块标题的文件，模块级变量
 _printed_modules = set()
-
-# pathlib：项目根目录/日志目录/失败用例JSON目录
-BASE_DIR = Path(__file__).parent.parent
-LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)  #不存在自动创建logs文件夹
-TEST_LOG_FILE = LOG_DIR / "test_run.log"
-FAIL_PAYLOAD_DIR = LOG_DIR / "fail_payload"
-FAIL_PAYLOAD_DIR.mkdir(exist_ok=True)
-
-# 测试日志logger（和业务logger互相独立）
-_test_logger = logging.getLogger("llm_test")
-_test_logger.setLevel(logging.INFO)
-# 每次初始化清空旧handler，适配常驻worker场景
-_test_logger.handlers.clear()
-
-log_formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-# 新建控制台输出handler
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(log_formatter)
-_test_logger.addHandler(stream_handler)
-# 新建文件输出handler
-file_handler = logging.FileHandler(TEST_LOG_FILE, encoding="utf-8")
-file_handler.setFormatter(log_formatter)
-_test_logger.addHandler(file_handler)
+# 失败用例信息的目录
+BASE_DIR = Path(__file__).parent.parent          # 项目根目录
+FAIL_PAYLOAD_DIR = BASE_DIR / "logs" / "fail_payload"
 
 
 @pytest.fixture
@@ -45,13 +28,58 @@ def max_length_prompt():
     return "a"*200
 
 
+@pytest.fixture(scope="session")
+def llm_client():
+    # session：整个测试会话只初始化一次，所有用例共用同一个client实例
+    cfg = load_llm_config()
+    client = LLMClient(
+        api_key=cfg["api_key"],
+        base_url=cfg["base_url"],
+        model=cfg["model"],
+        timeout=cfg["timeout"]
+    )
+    yield client
+    # yield后面可以写后置：关闭连接、清理资源
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_global_log():
+    FAIL_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ===== 1. 业务日志：llm_business，给LLMClient使用 =====
+    llm_log_path = BASE_DIR / "logs" / "llm_client.log"
+    llm_log_path.parent.mkdir(parents=True, exist_ok=True)
+    llm_biz_logger, llm_handlers = log_helper.init_logger(
+        log_name="llm_business",
+        log_file=llm_log_path
+    )
+
+    # ===== 2. 测试运行日志：test_run，给pytest用例、框架侧 =====
+    test_log_path = BASE_DIR / "logs" / "test_run.log"
+    test_log_path.parent.mkdir(parents=True, exist_ok=True)
+    test_run_logger, test_handlers = log_helper.init_logger(
+        log_name="test_run",
+        log_file=test_log_path
+    )
+
+    yield
+
+    # 会话结束，分别清理两套logger自己的handler，互不影响
+    for h in llm_handlers:
+        llm_biz_logger.removeHandler(h)
+        h.close()
+    for h in test_handlers:
+        test_run_logger.removeHandler(h)
+        h.close()
+
+
 ## ============ 用例执行失败，保存完整json信息 ============
-def save_fail_payload(case_name: str, payload_data: dict) -> str:
+def save_fail_payload(case_name: str, payload_data: dict, fail_payload_dir: Path) -> str:
     """保存失败用例完整payload，直接传入整个payload字典"""
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     safe_case_name = case_name[:50].replace("[", "_").replace("]", "_").replace("/", "_")
     filename = f"{safe_case_name}_{timestamp}.json"
-    save_path = FAIL_PAYLOAD_DIR / filename
+    save_path = fail_payload_dir / filename
 
     save_data = {
         "case_name": case_name,
@@ -66,6 +94,7 @@ def save_fail_payload(case_name: str, payload_data: dict) -> str:
 # ============ 用例前置钩子：日志记录模块名、用例名 ============
 def pytest_runtest_setup(item):
     module_name = item.module.__name__
+    _test_logger = logging.getLogger("test_run")
     if module_name not in _printed_modules:
         # 直接拿已经创建好的logger实例
         _test_logger.info(f"\n===== 【模块开始执行】模块名称：{module_name} =====")
@@ -85,15 +114,16 @@ def pytest_runtest_makereport(item, call):
     if not payload_data:
         # 没有payload数据，直接跳过
         return
-
+    _test_logger = logging.getLogger("test_run")
+    fail_payload_dir = FAIL_PAYLOAD_DIR
     prompt_len = payload_data["prompt_len"]
     resp_len = payload_data["response_len"]
-    expected_exception = payload_data["expected_exception"]
+    expected_exception = payload_data.get("expected_exception", "")
 
     if call.excinfo is not None:
         # 用例失败，保存json文件 + 输出错误日志+堆栈
         case_full_name = item.name
-        json_path = save_fail_payload(case_full_name, payload_data)
+        json_path = save_fail_payload(case_full_name, payload_data, fail_payload_dir)
         _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
         _test_logger.error(f"【用例失败】完整请求响应已保存至：{json_path}")
         tb_str = "".join(traceback.format_exception(call.excinfo.type, call.excinfo.value, call.excinfo.tb))
@@ -104,11 +134,3 @@ def pytest_runtest_makereport(item, call):
             _test_logger.info(f"【用例执行成功】用例名称：{item.name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
         else:
             _test_logger.info(f"【用例执行成功（捕获预期异常）】用例名称：{item.name}, prompt长度:{prompt_len}, 返回长度:{resp_len}, 捕获异常：{expected_exception}")
-
-
-# ============ 会话结束钩子，测试全部跑完自动清理logger ============
-def pytest_sessionfinish():
-    # 会话全部执行完毕，清理logger handler
-    for handler in _test_logger.handlers[:]:
-        handler.close()
-        _test_logger.removeHandler(handler)
