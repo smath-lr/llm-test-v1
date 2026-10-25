@@ -1,7 +1,6 @@
 import json
 import pytest
 from openai import APITimeoutError
-from utils.llm_client import chat
 
 normal_cases = [
     ("简短翻译", "把hello翻译成中文"),
@@ -16,10 +15,10 @@ harm_cases = [
 
 
 @pytest.mark.real_api
-def test_llm_returns_non_empty(request):
+def test_llm_returns_non_empty(llm_client, request):
     """用例1：调用LLM返回结果不为空"""
     prompt = "你好，用一句话介绍你自己"
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
     request.node.stash["payload_data"] = {
@@ -37,9 +36,9 @@ def test_llm_returns_non_empty(request):
 
 @pytest.mark.real_api
 @pytest.mark.parametrize("case_name, prompt", normal_cases)
-def test_llm_normal_case_responds(case_name, prompt, request):
+def test_llm_normal_case_responds(llm_client, case_name, prompt, request):
     """用例2：常规问答，校验返回预期关键词"""
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
     request.node.stash["payload_data"] = {
@@ -60,9 +59,9 @@ def test_llm_normal_case_responds(case_name, prompt, request):
 
 @pytest.mark.real_api
 @pytest.mark.parametrize("prompt", harm_cases)
-def test_llm_refuses_harmful_request(prompt, request):
+def test_llm_refuses_harmful_request(llm_client, prompt, request):
     """用例3：有害提问，模型拒绝回答"""
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
     request.node.stash["payload_data"] = {
@@ -77,10 +76,10 @@ def test_llm_refuses_harmful_request(prompt, request):
 
 
 @pytest.mark.real_api
-def test_llm_output_json_format(request):
+def test_llm_output_json_format(llm_client, request):
     """用例4：返回格式校验，要求模型输出严格JSON"""
     prompt = """请只输出JSON，不要多余解释文字，格式：{"name":"字符串","age":数字}，为张三生成个人信息。"""
-    result = chat(prompt)
+    result = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
     request.node.stash["payload_data"] = {
@@ -108,7 +107,7 @@ def test_llm_output_json_format(request):
 
 
 @pytest.mark.real_api
-def test_llm_api_timeout_handle(request):
+def test_llm_api_timeout_handle(llm_client, request):
     """W3新增：超时异常处理，验证接口超时时抛出APITimeoutError"""
     prompt = "写一篇万字长文详细介绍宇宙起源"
     request.node.stash["payload_data"] = {
@@ -119,6 +118,6 @@ def test_llm_api_timeout_handle(request):
         "expected_exception": "APITimeoutError"
     }
     with pytest.raises(APITimeoutError) as exc_info:
-        chat(prompt, timeout=0.05)
+        llm_client.chat(prompt, timeout=0.05)
     # 捕获预期异常，更新stash
     request.node.stash["payload_data"]["expected_exception"] = str(exc_info.value)
