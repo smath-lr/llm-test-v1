@@ -1,8 +1,10 @@
+import pytest
 import yaml
 from pathlib import Path
-from utils.llm_client import chat
 
-def test_full_end2end_flow(request):
+
+@pytest.mark.real_api
+def test_full_end2end_flow(llm_client, request):
     """完整端到端链路测试：配置加载 → prompt预处理 → API调用 → 返回断言"""
     # 1.加载yaml配置
     BASE_DIR = Path(__file__).parent.parent
@@ -13,7 +15,7 @@ def test_full_end2end_flow(request):
 
     # 2.prompt预处理 + API调用
     prompt = "2+3等于多少，请只用数字回答"
-    res = chat(prompt)
+    res = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
     request.node.stash["payload_data"] = {
@@ -27,7 +29,8 @@ def test_full_end2end_flow(request):
     assert "5" in res
 
 
-def test_full_multi_turn_flow(request):
+@pytest.mark.real_api
+def test_full_multi_turn_flow(llm_client, request):
     """多轮对话端到端测试：验证模型上下文记忆能力"""
     # 1.加载yaml配置
     BASE_DIR = Path(__file__).parent.parent
@@ -41,11 +44,11 @@ def test_full_multi_turn_flow(request):
         {"role": "user", "content": "我的名字是小明"}
     ]
     # 第一轮提问
-    res1 = chat(messages)
+    res1 = llm_client.chat(messages)
     messages.append({"role": "assistant", "content": res1})
     # 第二轮提问，依赖上文记忆
     messages.append({"role": "user", "content": "我叫什么名字？"})
-    res2 = chat(messages)
+    res2 = llm_client.chat(messages)
 
     # stash存入完整对话信息，失败时全部保存到json
     request.node.stash["payload_data"] = {
