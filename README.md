@@ -6,14 +6,17 @@
 - pytest
 - openai SDK
 - PyYAML
+- pytest-mock（mock 模拟接口调用，无需真实网络请求）
+- tenacity（chat 接口重试机制）
 - Allure-pytest（测试报告）
 
 ## 项目结构
 ```bash
 llm-test-v1
-├── config/                  # 配置目录，存放 API 密钥
+├── config/                  # 配置目录，存放 API 密钥与配置加载工具
 │   ├── config.example.yaml  # 配置模板（可提交 git，仅模板，不含真实密钥）
-│   └── config.yaml          # 本地私有密钥文件，.gitignore 忽略，不上传 git
+│   ├── config.yaml          # 本地私有密钥文件，.gitignore 忽略，不上传 git
+│   └── config_loader.py     # 配置加载工具模块：统一读取 config.yaml 中 API key 等配置
 ├── logs/                    # 自动生成，存放运行日志与失败报文，.gitignore 忽略
 │   ├── fail_payload/        # 保存测试失败时的完整 payload json 报文
 │   ├── llm_client.log       # LLM 业务调用日志
@@ -21,14 +24,17 @@ llm-test-v1
 ├── doc/                     # 项目文档、截图（Allure报告截图存放于此，可提交git）
 │   └── allure_report.png
 ├── utils/                   # 公共工具函数
-│   └── llm_client.py        # LLM 客户端封装
+│   ├── llm_client.py        # LLM 客户端封装（LLMClient 类：chat 等能力封装，含重试装饰器）
+│   └── log_helper.py        # 日志辅助模块：logger、handler 统一创建与配置
 ├── tests/                   # pytest 测试用例集合
-│   ├── conftest.py          # pytest 全局钩子、日志、失败报文保存逻辑
+│   ├── conftest.py          # pytest 全局钩子、logger fixture、llm_client 实例 fixture、失败报文保存逻辑
 │   ├── test_llm_basic.py            # 基础冒烟用例
-│   ├── test_api_response.py          # API 返回结构校验
-│   ├── test_prompt_boundary.py       # Prompt 边界值测试
-│   ├── test_prompt_equivalence.py    # 等价类 prompt 测试
-│   └── test_full_flow.py             # 完整业务流程测试
+│   ├── test_api_response.py         # API 返回结构校验
+│   ├── test_prompt_boundary.py      # Prompt 边界值测试
+│   ├── test_prompt_equivalence.py   # 等价类 prompt 测试
+│   ├── test_full_flow.py            # 完整业务流程测试
+│   └── test_llm_mock.py             # 纯 mock 用例：模拟 API 调用，不联网、不消耗 token，含重试逻辑测试
+├── pytest.ini               # pytest 配置：marker 注册、addopts、搜索规则
 ├── allure-results/          # allure原始测试json数据，运行自动生成，.gitignore忽略
 ├── allure-report/           # allure网页报告产物，运行自动生成，.gitignore忽略
 ├── requirements.txt
@@ -77,6 +83,26 @@ python -m pytest tests/ -v
 python -m pytest tests/ -v -s
 ```
 
+按标记筛选执行（结合 `-m` 参数）：
+```powershell
+# 只执行 mock 用例（不联网、不消耗 token）
+python -m pytest -v -m mock
+
+# 只执行真实 API 用例（会消耗 token）
+python -m pytest -v -m real_api
+```
+
+## 测试标记体系（pytest.ini 已注册）
+所有测试用例按是否使用 mock 统一打标签，便于分类执行与报告归集：
+
+| 标记 | 含义 |
+| ---- | ---- |
+| `mock` | 使用 mocker 补丁模拟调用 API 接口，非真实网络请求，不消耗 token |
+| `real_api` | 真实调用 LLM 接口，会产生 token 消耗 |
+| `slow` | LLM 长推理，耗时较高的用例 |
+| `llm_stream` | 流式返回 chunk 测试 |
+| `need_retry` | 容易触发 429/504、需要重试逻辑的接口用例 |
+
 ## 测试覆盖范围
 1. **基础冒烟测试**：验证大模型正常返回、基础问答、安全内容拒绝
 2. **API返回校验**：真实请求校验正常返回值类型；mock 模拟空 choices 场景、服务 500 异常场景，验证异常捕获逻辑，mock 用例无需联网、不消耗 token
@@ -85,6 +111,11 @@ python -m pytest tests/ -v -s
 5. **全流程端到端测试（test_full_flow.py）**
     - 单轮链路：配置加载、prompt预处理、API调用、返回断言，验证完整单次调用链路；
     - 多轮对话：连续多轮交互，验证LLM上下文记忆能力，检验模型能否记住前文对话信息。
+6. **Mock 模拟测试（test_llm_mock.py）**
+    - 全部用例基于 `pytest-mock` 模拟 API 调用，不联网、不消耗 token；
+    - 覆盖异常场景（空 choices、服务端 500 等），验证异常捕获与容错逻辑。
+7. **重试逻辑测试（test_llm_mock.py 内新增 4 条用例）**
+    - 针对 `LLMClient.chat` 的 `retry` 重试装饰器，验证在 超时 / 连接失败 触发时能按预期重试并最终成功或按规则退出。
 
 ## Allure测试报告
 ### 1、生成原始结果（需要激活虚拟环境）
