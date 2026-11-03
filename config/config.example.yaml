@@ -2,5 +2,5 @@
 deepseek:
   api_key: ""
   base_url: "https://api.deepseek.com"
-  model: "deepseek-chat"
+  model: "deepseek-flash"
   timeout: 15

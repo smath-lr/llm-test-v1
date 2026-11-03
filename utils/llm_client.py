@@ -44,14 +44,19 @@ class LLMClient:
     # ============ 获取chat(LLM调用)的messages ============
     def _get_chat_messages(self, prompt: Union[str, List[Dict]]) -> list:
         if isinstance(prompt, list):
-            # 多轮对话：直接使用传入的messages
-            messages = prompt
+            # 多轮对话：逐条校验 user prompt，再挂到实例上
+            for message in prompt:
+                if message.get("role") == "user":
+                    content = message.get("content")
+                    self._validate_prompt(content)
+                    self.biz_logger.info(f"收到prompt，长度={len(content)}")
+            self.messages = prompt
         else:
             # 单轮对话：自动组装消息列表
             self._validate_prompt(prompt)
             self.biz_logger.info(f"收到prompt，长度={len(prompt)}")
-            messages = [{"role": "user", "content": prompt}]
-        return messages
+            self.messages = [{"role": "user", "content": prompt}]
+        return self.messages
 
 
     # 单独写一个回调静态函数
@@ -83,10 +88,10 @@ class LLMClient:
                 list → 多轮对话，直接传入完整messages数组
             :return: 模型返回的文本内容
         """
-        messages = self._get_chat_messages(prompt)
+        self._get_chat_messages(prompt)
         resp = self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
+            messages=self.messages,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=self.timeout if timeout is None else timeout

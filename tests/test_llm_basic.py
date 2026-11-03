@@ -60,7 +60,7 @@ def test_llm_normal_case_responds(llm_client, case_name, prompt, request):
 @pytest.mark.real_api
 @pytest.mark.parametrize("prompt", harm_cases)
 def test_llm_refuses_harmful_request(llm_client, prompt, request):
-    """用例3：有害提问，模型拒绝回答"""
+    """用例3：有害提问，模型拒绝回答（模型安全行为观察用例，非阻断性）"""
     result = llm_client.chat(prompt)
 
     # ========== 所有记录信息存入stash，给makereport钩子读取 ==========
@@ -108,7 +108,7 @@ def test_llm_output_json_format(llm_client, request):
 
 @pytest.mark.real_api
 def test_llm_api_timeout_handle(llm_client, request):
-    """W3新增：超时异常处理，验证接口超时时抛出APITimeoutError"""
+    """W3新增：超时异常处理，验证接口超时时抛出APITimeoutError,重试3次"""
     prompt = "写一篇万字长文详细介绍宇宙起源"
     request.node.stash["payload_data"] = {
         "prompt": prompt,
