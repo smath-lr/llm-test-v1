@@ -16,6 +16,19 @@ _printed_modules = set()
 # 失败用例信息的目录
 BASE_DIR = Path(__file__).parent.parent          # 项目根目录
 FAIL_PAYLOAD_DIR = BASE_DIR / "logs" / "fail_payload"
+# mock 用例共用的假密钥，其它文件引用这个变量，不直接写字符串
+MOCK_API_KEY = "sk-mock"
+
+
+def _build_llm_client(cfg, api_key):
+    return LLMClient(
+        api_key=api_key,
+        base_url=cfg["base_url"],
+        model=cfg["model"],
+        timeout=cfg["timeout"],
+        temperature=cfg["temperature"],
+        max_tokens=cfg["max_tokens"],
+    )
 
 
 @pytest.fixture
@@ -35,19 +48,29 @@ def llm_config():
 
 
 @pytest.fixture(scope="session")
-def llm_client(llm_config):
-    # session：整个测试会话只初始化一次，所有用例共用同一个client实例
-    cfg = llm_config
-    client = LLMClient(
-        api_key=cfg["api_key"],
-        base_url=cfg["base_url"],
-        model=cfg["model"],
-        timeout=cfg["timeout"],
-        temperature=cfg["temperature"],
-        max_tokens=cfg["max_tokens"]
-    )
-    yield client
-    # yield后面可以写后置：关闭连接、清理资源
+def mock_api_key():
+    """session：假密钥变量，mock 客户端和用例共用"""
+    return MOCK_API_KEY
+
+
+@pytest.fixture(scope="session")
+def llm_client_real(llm_config):
+    """session：真实 api_key，real_api 用例共用"""
+    yield _build_llm_client(llm_config, llm_config["api_key"])
+
+
+@pytest.fixture(scope="session")
+def llm_client_mock(llm_config, mock_api_key):
+    """session：假 api_key，mock 用例共用"""
+    yield _build_llm_client(llm_config, mock_api_key)
+
+
+@pytest.fixture
+def llm_client(request):
+    """按标记只取一个 session 客户端：real_api、双标记、未打标用真实密钥，仅 mock 用假密钥"""
+    if request.node.get_closest_marker("real_api") is not None or request.node.get_closest_marker("mock") is None:
+        return request.getfixturevalue("llm_client_real")
+    return request.getfixturevalue("llm_client_mock")
 
 
 @pytest.fixture(scope="session", autouse=True)

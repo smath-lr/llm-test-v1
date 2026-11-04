@@ -1,3 +1,4 @@
+"""本文件同时有 mock 和 real_api，llm_client 按标记选密钥。"""
 import os
 
 import pytest
@@ -79,8 +80,8 @@ def test_mock_multi_turn_messages_passed(llm_client, mocker, request):
 
 # ============ 请求参数传递：默认值 ============
 @pytest.mark.mock
-def test_mock_chat_default_request_params(llm_client, llm_config, mocker, request):
-    """Mock用例：未改写时 model、timeout、temperature、max_tokens、base_url 走配置；api_key 使用环境变量预期配置"""
+def test_mock_chat_default_request_params(llm_client, llm_config, mock_api_key, mocker, request):
+    """Mock用例：未改写时 model、timeout、temperature、max_tokens、base_url 走配置；mock 标记使用假 api_key"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     reply = "默认参数传递成功"
     mock_create.return_value = mocker.Mock(
@@ -117,8 +118,16 @@ def test_mock_chat_default_request_params(llm_client, llm_config, mocker, reques
     assert str(llm_client.client.base_url) == str(llm_config["base_url"])
     # 只断言是否一致，避免失败报文打出真实 api_key
     env_api_key = os.getenv("DEEPSEEK_API_KEY")
+    api_key_ok = str(llm_client.client.api_key) == mock_api_key and str(llm_client.client.api_key) != env_api_key
+    assert api_key_ok, "mock 用例应使用假 api_key"
+
+
+@pytest.mark.real_api
+def test_real_api_uses_env_api_key(llm_client):
+    """real_api 标记把 .env 中的真实 api_key 传给客户端，不发起对话"""
+    env_api_key = os.getenv("DEEPSEEK_API_KEY")
     api_key_ok = bool(env_api_key) and str(llm_client.client.api_key) == env_api_key
-    assert api_key_ok, "客户端 api_key 与 .env 的 DEEPSEEK_API_KEY 不一致"
+    assert api_key_ok, "real_api 用例应使用 .env 的 DEEPSEEK_API_KEY"
 
 
 # ============ 请求参数传递：调用时改写 ============

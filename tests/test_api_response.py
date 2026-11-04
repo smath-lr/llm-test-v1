@@ -1,3 +1,4 @@
+"""本文件同时有 mock 和 real_api，llm_client 按标记选密钥。"""
 import pytest
 from openai import APIError
 
