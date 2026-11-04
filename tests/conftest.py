@@ -29,14 +29,22 @@ def max_length_prompt():
 
 
 @pytest.fixture(scope="session")
-def llm_client():
+def llm_config():
+    """整个会话只加载一次配置，用例和客户端共用这一份"""
+    return load_llm_config()
+
+
+@pytest.fixture(scope="session")
+def llm_client(llm_config):
     # session：整个测试会话只初始化一次，所有用例共用同一个client实例
-    cfg = load_llm_config()
+    cfg = llm_config
     client = LLMClient(
         api_key=cfg["api_key"],
         base_url=cfg["base_url"],
         model=cfg["model"],
-        timeout=cfg["timeout"]
+        timeout=cfg["timeout"],
+        temperature=cfg["temperature"],
+        max_tokens=cfg["max_tokens"]
     )
     yield client
     # yield后面可以写后置：关闭连接、清理资源

@@ -1,17 +1,12 @@
 import pytest
-import yaml
-from pathlib import Path
 
 
 @pytest.mark.real_api
-def test_full_end2end_flow(llm_client, request):
+def test_full_end2end_flow(llm_client, llm_config, request):
     """完整端到端链路测试：配置加载 → prompt预处理 → API调用 → 返回断言"""
-    # 1.加载yaml配置
-    BASE_DIR = Path(__file__).parent.parent
-    config_path = BASE_DIR / "config" / "config.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    assert cfg["deepseek"]["api_key"] is not None
+    # 1.配置已由 llm_config 加载，api_key 来自 .env，这里只确认已配置
+    api_key_ok = bool(llm_config.get("api_key"))
+    assert api_key_ok
 
     # 2.prompt预处理 + API调用
     prompt = "2+3等于多少，请只用数字回答"
@@ -30,14 +25,11 @@ def test_full_end2end_flow(llm_client, request):
 
 
 @pytest.mark.real_api
-def test_full_multi_turn_flow(llm_client, request):
+def test_full_multi_turn_flow(llm_client, llm_config, request):
     """多轮对话端到端测试：验证模型上下文记忆能力"""
-    # 1.加载yaml配置
-    BASE_DIR = Path(__file__).parent.parent
-    config_path = BASE_DIR / "config" / "config.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    assert cfg["deepseek"]["api_key"] is not None
+    # 1.配置已由 llm_config 加载，api_key 来自 .env，这里只确认已配置
+    api_key_ok = bool(llm_config.get("api_key"))
+    assert api_key_ok
 
     # 构造多轮对话上下文
     messages = [

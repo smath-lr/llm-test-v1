@@ -12,7 +12,7 @@ RETRY_EXC = (APITimeoutError, APIConnectionError)
 
 # ============ LLM api客户端对象 ============
 class LLMClient:
-    def __init__(self, api_key, base_url, model, timeout):
+    def __init__(self, api_key, base_url, model, timeout, temperature, max_tokens):
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -20,6 +20,8 @@ class LLMClient:
         )
         self.model = model
         self.timeout = timeout
+        self.temperature = temperature
+        self.max_tokens = max_tokens
         self.max_prompt_length = MAX_PROMPT_LENGTH
         # 拿【业务logger llm_business】
         self.biz_logger = logging.getLogger("llm_business")
@@ -76,11 +78,11 @@ class LLMClient:
     @retry(
         stop=stop_after_attempt(3),        # 最多重试2次（原始1次 + 重试2次，合计尝试3次）
         wait=wait_fixed(1),                # 每次重试间隔 1s
-        retry=retry_if_exception_type(RETRY_EXC),  # 只在这两类异常才重试a
+        retry=retry_if_exception_type(RETRY_EXC),  # 只在这两类异常才重试
         before_sleep=_on_retry_sleep,  # 准备重试休眠前打印
         reraise=True,                      # 重试耗尽之后，继续向上抛出异常
     )
-    def chat(self, prompt, timeout=None, temperature=0.7, max_tokens=500):
+    def chat(self, prompt, timeout=None, temperature=None, max_tokens=None, model=None):
         """
         【调用 DeepSeek，返回模型回复】统一对话入口，兼容两种入参
             :param prompt:
@@ -90,10 +92,10 @@ class LLMClient:
         """
         self._get_chat_messages(prompt)
         resp = self.client.chat.completions.create(
-            model=self.model,
+            model=self.model if model is None else model,
             messages=self.messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
+            temperature=self.temperature if temperature is None else temperature,
+            max_tokens=self.max_tokens if max_tokens is None else max_tokens,
             timeout=self.timeout if timeout is None else timeout
         )
 
