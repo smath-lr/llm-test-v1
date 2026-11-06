@@ -55,7 +55,7 @@ def test_mock_multi_turn_messages_passed(llm_client, mocker, request):
         {"role": "assistant", "content": "你好，小明"},
         {"role": "user", "content": "我叫什么名字？"},
     ]
-    result = llm_client.chat(messages)
+    result = llm_client.chat(messages=messages)
 
     request.node.stash["payload_data"] = {
         "multi_turn_messages": messages,

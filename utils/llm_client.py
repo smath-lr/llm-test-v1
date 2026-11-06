@@ -2,7 +2,6 @@ import logging
 import random
 import time
 from email.utils import parsedate_to_datetime
-from typing import Dict, List, Union
 
 from httpx2 import ConnectError, RemoteProtocolError
 from openai import APIConnectionError, InternalServerError, OpenAI, RateLimitError
@@ -155,38 +154,71 @@ class LLMClient:
         self.biz_logger = logging.getLogger("llm_business")
 
 
-    # ============ 校验 prompt 输入合法性 ============
+    # ============ 校验字符串 prompt 的内容 ============
     def _validate_prompt(self, prompt: str) -> None:
-        """校验 prompt 输入合法性，非法则抛 ValueError。"""
-        if prompt is None:
-            self.biz_logger.error("参数校验失败：prompt 为 None")
-            raise ValueError("prompt不能为None")   
-        
+        """校验字符串 prompt。空内容和超长抛 ValueError。"""
         if len(prompt.strip()) == 0:
             self.biz_logger.error("参数校验失败：prompt 为 空字符串")
             raise ValueError("prompt不能为空")
-        
+
         if len(prompt) > self.max_prompt_length:
             self.biz_logger.error(f"参数校验失败：prompt 超长，长度={len(prompt)}")
             raise ValueError(f"prompt长度不能超过{self.max_prompt_length}")
 
 
-    # ============ 获取chat(LLM调用)的messages ============
-    def _get_chat_messages(self, prompt: Union[str, List[Dict]]) -> list:
-        if isinstance(prompt, list):
-            # 多轮对话：逐条校验 user prompt，再挂到实例上
-            for message in prompt:
-                if message.get("role") == "user":
-                    content = message.get("content")
-                    self._validate_prompt(content)
-                    self.biz_logger.info(f"收到prompt，长度={len(content)}")
-            self.messages = prompt
-        else:
-            # 单轮对话：自动组装消息列表
-            self._validate_prompt(prompt)
-            self.biz_logger.info(f"收到prompt，长度={len(prompt)}")
-            self.messages = [{"role": "user", "content": prompt}]
-        return self.messages
+    # ============ 校验组合 messages 的结构 ============
+    def _validate_message_list(self, messages: list) -> None:
+        """校验消息列表的结构、角色和顺序，非法则抛 ValueError。"""
+        if len(messages) == 0:
+            self.biz_logger.error("参数校验失败：messages 为空列表")
+            raise ValueError("messages不能为空列表")
+        for index, message in enumerate(messages, start=1):
+            if not isinstance(message, dict):
+                self.biz_logger.error(f"参数校验失败：第{index}条message不是字典")
+                raise ValueError(f"第{index}条message格式不正确")
+            if "role" not in message or message.get("role") is None:
+                self.biz_logger.error(f"参数校验失败：第{index}条message缺少role")
+                raise ValueError(f"第{index}条message缺少role")
+            if "content" not in message or message.get("content") is None:
+                self.biz_logger.error(f"参数校验失败：第{index}条message缺少content")
+                raise ValueError(f"第{index}条message缺少content")
+            if set(message) != {"role", "content"}:
+                self.biz_logger.error(f"参数校验失败：第{index}条message含有role、content以外的字段")
+                raise ValueError(f"第{index}条message只能包含role和content")
+            expected_role = "user" if index % 2 == 1 else "assistant"
+            if message["role"] != expected_role:
+                self.biz_logger.error(f"参数校验失败：第{index}条message的role必须为{expected_role}")
+                raise ValueError(f"第{index}条message的role必须为{expected_role}")
+            if not isinstance(message["content"], str):
+                self.biz_logger.error(f"参数校验失败：第{index}条message的content不是字符串")
+                raise ValueError(f"第{index}条message的content必须为字符串")
+        if len(messages) % 2 == 0:
+            self.biz_logger.error("参数校验失败：messages 条数不是单数")
+            raise ValueError("messages条数必须为1、3、5……这种单数")
+
+
+    def _use_prompt(self, prompt) -> None:
+        """单轮：prompt 必须是字符串。None 和其他类型都按不是字符串处理。"""
+        if not isinstance(prompt, str):
+            self.biz_logger.error("参数校验失败：prompt 不是字符串")
+            raise ValueError("prompt必须为字符串")
+        self._validate_prompt(prompt)
+        self.biz_logger.info(f"收到prompt，长度={len(prompt)}")
+        self.messages = [{"role": "user", "content": prompt}]
+
+
+    def _use_messages(self, messages) -> None:
+        """组合对话：messages 为消息列表，合法条数是 1、3、5……。"""
+        if not isinstance(messages, list):
+            self.biz_logger.error("参数校验失败：messages 不是列表")
+            raise ValueError("messages必须为消息列表")
+        self._validate_message_list(messages)
+        for message in messages:
+            if message["role"] == "user":
+                content = message["content"]
+                self._validate_prompt(content)
+                self.biz_logger.info(f"收到prompt，长度={len(content)}")
+        self.messages = messages
 
 
     # 第一次请求开始前，把截止时间记在本次重试状态上
@@ -245,15 +277,23 @@ class LLMClient:
         before_sleep=_on_retry_sleep,
         reraise=True,
     )
-    def chat(self, prompt, timeout=None, temperature=None, max_tokens=None, model=None):
+    def chat(self, prompt=None, messages=None, timeout=None, temperature=None, max_tokens=None, model=None):
         """
-        【调用 DeepSeek，返回模型回复】统一对话入口，兼容两种入参
-            :param prompt:
-                字符串 → 单轮对话，自动包装成messages
-                list → 多轮对话，直接传入完整messages数组
+        【调用 DeepSeek，返回模型回复】
+            :param prompt: 单轮字符串
+            :param messages: 组合消息列表，条数为 1、3、5……
             :return: 模型返回的文本内容
         """
-        self._get_chat_messages(prompt)
+        if prompt is not None and messages is not None:
+            self.biz_logger.error("参数校验失败：prompt 与 messages 同时传入")
+            raise ValueError("prompt和messages只能传一个")
+        if prompt is None and messages is None:
+            self.biz_logger.error("参数校验失败：prompt 和 messages 必须传一个")
+            raise ValueError("prompt和messages必须传一个")
+        if messages is not None:
+            self._use_messages(messages)
+        else:
+            self._use_prompt(prompt)
         resp = self.client.chat.completions.create(
             model=self.model if model is None else model,
             messages=self.messages,

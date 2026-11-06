@@ -36,11 +36,11 @@ def test_full_multi_turn_flow(llm_client, llm_config, request):
         {"role": "user", "content": "我的名字是小明"}
     ]
     # 第一轮提问
-    res1 = llm_client.chat(messages)
+    res1 = llm_client.chat(messages=messages)
     messages.append({"role": "assistant", "content": res1})
     # 第二轮提问，依赖上文记忆
     messages.append({"role": "user", "content": "我叫什么名字？"})
-    res2 = llm_client.chat(messages)
+    res2 = llm_client.chat(messages=messages)
 
     # stash存入完整对话信息，失败时全部保存到json
     request.node.stash["payload_data"] = {
