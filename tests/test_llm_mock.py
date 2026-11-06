@@ -1,7 +1,5 @@
 import json
 from openai import (
-    APIConnectionError,
-    APITimeoutError,
     BadRequestError,
     InternalServerError,
     RateLimitError,
@@ -159,7 +157,6 @@ def test_mock_chat_parametrize(llm_client, mocker, request, case_title, prompt, 
     mock_create.assert_called_once()
 
 
-# ============ 异常返回用例-不重试 ============
 # ============ 异常返回用例-不重试：prompt 参数校验 ============
 @pytest.mark.mock
 def test_mock_chat_prompt_empty(llm_client, mocker, request):
@@ -313,158 +310,6 @@ def test_mock_chat_server_500_error(llm_client, mocker, request):
     assert exc_info.value.body == {"code": 500, "message": "服务内部异常"}
     # 只调用1次，不重试
     mock_create.assert_called_once()
-
-
-# ============ 异常重试用例 ============
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_timeout_fail_3_times(llm_client, mocker, request):
-    """Mock用例：超时连续失败3次，重试耗尽后抛出 APITimeoutError"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    mock_create.side_effect = APITimeoutError(request=None)
-
-    prompt = "超时失败3次"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": None,
-        "response_len": 0,
-        "expected_exception": "APITimeoutError",
-    }
-    with pytest.raises(APITimeoutError, match="Request timed out."):
-        llm_client.chat(prompt)
-    # 原始1次 + 重试2次，合计3次
-    assert mock_create.call_count == 3
-
-
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_connection_fail_3_times(llm_client, mocker, request):
-    """Mock用例：连接异常连续失败3次，重试耗尽后抛出 APIConnectionError"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    mock_create.side_effect = APIConnectionError(
-        message="connection refuse",
-        request=None,
-    )
-
-    prompt = "连接异常失败3次"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": None,
-        "response_len": 0,
-        "expected_exception": "APIConnectionError",
-    }
-    with pytest.raises(APIConnectionError, match="connection refuse"):
-        llm_client.chat(prompt)
-    # 原始1次 + 重试2次，合计3次
-    assert mock_create.call_count == 3
-
-
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_timeout_fail_2_then_success(llm_client, mocker, request):
-    """Mock用例：超时失败2次，第3次成功返回"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    success_text = "超时重试第3次成功"
-    mock_create.side_effect = [
-        APITimeoutError(request=None),
-        APITimeoutError(request=None),
-        mocker.Mock(
-            choices=[mocker.Mock(message=mocker.Mock(content=success_text))]
-        ),
-    ]
-
-    prompt = "超时失败2次第3次成功"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": success_text,
-        "response_len": len(success_text),
-        "expected_exception": None,
-    }
-    result = llm_client.chat(prompt)
-    assert result == success_text
-    assert mock_create.call_count == 3
-
-
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_connection_fail_2_then_success(llm_client, mocker, request):
-    """Mock用例：连接异常失败2次，第3次成功返回"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    success_text = "连接异常重试第3次成功"
-    mock_create.side_effect = [
-        APIConnectionError(message="connection refuse", request=None),
-        APIConnectionError(message="connection refuse", request=None),
-        mocker.Mock(
-            choices=[mocker.Mock(message=mocker.Mock(content=success_text))]
-        ),
-    ]
-
-    prompt = "连接异常失败2次第3次成功"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": success_text,
-        "response_len": len(success_text),
-        "expected_exception": None,
-    }
-    result = llm_client.chat(prompt)
-    assert result == success_text
-    assert mock_create.call_count == 3
-
-
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_timeout_fail_1_then_success(llm_client, mocker, request):
-    """Mock用例：超时失败1次，第2次成功返回"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    success_text = "超时重试第2次成功"
-    mock_create.side_effect = [
-        APITimeoutError(request=None),
-        mocker.Mock(
-            choices=[mocker.Mock(message=mocker.Mock(content=success_text))]
-        ),
-    ]
-
-    prompt = "超时失败1次第2次成功"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": success_text,
-        "response_len": len(success_text),
-        "expected_exception": None,
-    }
-    result = llm_client.chat(prompt)
-    assert result == success_text
-    assert mock_create.call_count == 2
-
-
-@pytest.mark.mock
-@pytest.mark.need_retry
-def test_mock_chat_retry_connection_fail_1_then_success(llm_client, mocker, request):
-    """Mock用例：连接异常失败1次，第2次成功返回"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    success_text = "连接异常重试第2次成功"
-    mock_create.side_effect = [
-        APIConnectionError(message="connection refuse", request=None),
-        mocker.Mock(
-            choices=[mocker.Mock(message=mocker.Mock(content=success_text))]
-        ),
-    ]
-
-    prompt = "连接异常失败1次第2次成功"
-    request.node.stash["payload_data"] = {
-        "prompt": prompt,
-        "prompt_len": len(prompt),
-        "response": success_text,
-        "response_len": len(success_text),
-        "expected_exception": None,
-    }
-    result = llm_client.chat(prompt)
-    assert result == success_text
-    assert mock_create.call_count == 2
 
 
 # @pytest.mark.mock

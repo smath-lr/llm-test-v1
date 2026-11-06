@@ -108,7 +108,7 @@ def test_llm_output_json_format(llm_client, request):
 
 @pytest.mark.real_api
 def test_llm_api_timeout_handle(llm_client, request):
-    """W3新增：超时异常处理，验证接口超时时抛出APITimeoutError,重试3次"""
+    """W3新增：超时异常处理，验证接口超时时抛出APITimeoutError，超时不重试"""
     prompt = "写一篇万字长文详细介绍宇宙起源"
     request.node.stash["payload_data"] = {
         "prompt": prompt,
