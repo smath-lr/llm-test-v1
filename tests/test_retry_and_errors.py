@@ -6,7 +6,7 @@ from openai import (
 )
 
 
-# ============ 异常返回用例-不重试：API 429、400、500 ============
+# ============ 重试与异常请求：400、429、500 不重试 ============
 @pytest.mark.mock
 def test_mock_chat_api_429_error(llm_client, mocker, record_payload):
     """Mock用例：模拟OpenAI服务端429限流，不重试，直接抛出 RateLimitError"""

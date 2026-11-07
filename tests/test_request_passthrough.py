@@ -3,7 +3,8 @@ import os
 import pytest
 
 
-# ============ 请求参数传递：单轮 Prompt 转换 ============
+# ============ 单轮 / 多轮请求组装与参数透传 ============
+# ============ 单轮 Prompt 转换 ============
 @pytest.mark.mock
 def test_mock_single_turn_prompt_to_messages(llm_client, mocker, record_payload):
     """Mock用例：单轮 prompt 转换为 messages，role 为 user，content 为原 prompt"""

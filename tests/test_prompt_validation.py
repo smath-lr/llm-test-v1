@@ -3,7 +3,7 @@ import pytest
 from utils.llm_client import MAX_PROMPT_LENGTH
 
 
-# ============ 异常返回用例-不重试：prompt 参数校验 ============
+# ============ Prompt / messages 输入校验 ============
 @pytest.mark.mock
 def test_mock_chat_prompt_empty(llm_client, mocker, record_payload):
     """Mock用例：传入空prompt，本地参数校验拦截，不请求远端"""

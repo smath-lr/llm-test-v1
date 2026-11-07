@@ -6,6 +6,7 @@ from openai import APITimeoutError
 
 from tests.conftest import MOCK_API_KEY
 
+# ============ 真实 API 冒烟 ============
 normal_cases = [
     ("简短翻译", "把hello翻译成中文"),
     ("简单计算", "1+1等于几"),
