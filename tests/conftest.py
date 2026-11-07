@@ -73,6 +73,46 @@ def llm_client(request):
     return request.getfixturevalue("llm_client_mock")
 
 
+def _measured_prompt_len(prompt):
+    """字符串记字符数。messages 只记每条 user 内容的字符数。其余记 None。"""
+    if isinstance(prompt, str):
+        return len(prompt)
+    if isinstance(prompt, list) and all(isinstance(item, dict) for item in prompt):
+        return [
+            len(item["content"])
+            for item in prompt
+            if item.get("role") == "user" and isinstance(item.get("content"), str)
+        ]
+    return None
+
+
+def _measured_response_len(response):
+    """只记回复是字符串的字符数。没有回复记 0。"""
+    if isinstance(response, str):
+        return len(response)
+    return 0
+
+
+@pytest.fixture
+def record_payload(request):
+    """把本次调用的 prompt、回复交给 makereport。长度在这里计算，用例只传原始值。"""
+
+    def _record(prompt, response=None, exc=None, **extra):
+        prompt_len = extra.pop("prompt_len") if "prompt_len" in extra else _measured_prompt_len(prompt)
+        payload = {
+            **extra,
+            "prompt": prompt,
+            "prompt_len": prompt_len,
+            "response": response,
+            "response_len": _measured_response_len(response),
+        }
+        if exc:
+            payload["expected_exception"] = exc
+        request.node.stash["payload_data"] = payload
+
+    return _record
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_global_log():
     FAIL_PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
