@@ -27,13 +27,12 @@ llm-test-v1
 │   ├── llm_client.py        # LLM 客户端封装（LLMClient 类：chat 等能力封装，含重试装饰器）
 │   └── log_helper.py        # 日志辅助模块：logger、handler 统一创建与配置
 ├── tests/                   # pytest 测试用例集合
-│   ├── conftest.py          # pytest 全局钩子、logger fixture、llm_client 实例 fixture、失败报文保存逻辑
-│   ├── test_llm_basic.py            # 基础冒烟用例
-│   ├── test_api_response.py         # API 返回结构校验
-│   ├── test_prompt_boundary.py      # Prompt 边界值测试
-│   ├── test_prompt_equivalence.py   # 等价类 prompt 测试
-│   ├── test_full_flow.py            # 完整业务流程测试
-│   └── test_llm_mock.py             # 纯 mock 用例：模拟 API 调用，不联网、不消耗 token，含重试逻辑测试
+│   ├── conftest.py                  # pytest 全局钩子、logger fixture、llm_client 实例 fixture、失败报文保存逻辑
+│   ├── test_prompt_validation.py    # Prompt / messages 输入校验
+│   ├── test_request_passthrough.py  # 单轮、多轮请求组装与参数透传
+│   ├── test_retry_and_errors.py     # 400、429、500 不重试
+│   ├── test_response_parsing.py     # 服务端响应解析
+│   └── test_real_api_smoke.py       # 真实 API 冒烟
 ├── pytest.ini               # pytest 配置：marker 注册、addopts、搜索规则
 ├── allure-results/          # allure原始测试json数据，运行自动生成，.gitignore忽略
 ├── allure-report/           # allure网页报告产物，运行自动生成，.gitignore忽略
@@ -108,13 +107,11 @@ python -m pytest -v -m real_api
 2. **API返回校验**：真实请求校验正常返回值类型；mock 模拟空 choices 场景、服务 500 异常场景，验证异常捕获逻辑，mock 用例无需联网、不消耗 token
 3. **边界用例**：参数化校验 Prompt 长度边界，覆盖最短有效输入、上限临界值、超限场景；验证超长 prompt 会触发参数校验异常
 4. **等价类测试**：采用参数化，划分有效、无效等价类。有效类包含普通中文、特殊字符 + emoji；无效类覆盖空串、None、纯空白字符串、超长文本，校验输入合法性判断逻辑。
-5. **全流程端到端测试（test_full_flow.py）**
-    - 单轮链路：配置加载、prompt预处理、API调用、返回断言，验证完整单次调用链路；
-    - 多轮对话：连续多轮交互，验证LLM上下文记忆能力，检验模型能否记住前文对话信息。
-6. **Mock 模拟测试（test_llm_mock.py）**
-    - 全部用例基于 `pytest-mock` 模拟 API 调用，不联网、不消耗 token；
-    - 覆盖异常场景（空 choices、服务端 500 等），验证异常捕获与容错逻辑。
-7. **重试逻辑测试（test_llm_mock.py 内新增 4 条用例）**
+5. **真实 API 冒烟（test_real_api_smoke.py）**
+    - 真实密钥透传、单轮问答、有害提问拒绝、JSON 输出、超短超时。
+6. **Mock 模拟测试**
+    - 输入校验、请求透传、异常不重试、响应解析，基于 `pytest-mock`，不联网、不消耗 token。
+7. **重试逻辑测试**
     - 针对 `LLMClient.chat` 的 `retry` 重试装饰器，验证在 超时 / 连接失败 触发时能按预期重试并最终成功或按规则退出。
 
 ## Allure测试报告
