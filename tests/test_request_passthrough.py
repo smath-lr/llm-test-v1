@@ -54,9 +54,9 @@ def test_mock_multi_turn_messages_passed(llm_client, mocker, record_payload):
         {"role": "user", "content": "我叫什么名字？"},
     ]
     expected_messages = [dict(item) for item in messages]
-    record_payload(messages)
+    record_payload(messages=messages)
     result = llm_client.chat(messages=messages)
-    record_payload(messages, result)
+    record_payload(messages=messages, response=result)
 
     assert result == reply
     mock_create.assert_called_once()

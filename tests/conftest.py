@@ -74,13 +74,18 @@ def llm_client(request):
 
 
 def _measured_prompt_len(prompt):
-    """字符串记字符数。messages 只记每条 user 内容的字符数。其余记 None。"""
+    """只记字符串的字符数。不是字符串记 None。"""
     if isinstance(prompt, str):
         return len(prompt)
-    if isinstance(prompt, list) and all(isinstance(item, dict) for item in prompt):
+    return None
+
+
+def _measured_messages_len(messages):
+    """只记消息列表里每条 user 内容的字符数。没传或不是消息列表记 None。"""
+    if isinstance(messages, list) and all(isinstance(item, dict) for item in messages):
         return [
             len(item["content"])
-            for item in prompt
+            for item in messages
             if item.get("role") == "user" and isinstance(item.get("content"), str)
         ]
     return None
@@ -95,14 +100,17 @@ def _measured_response_len(response):
 
 @pytest.fixture
 def record_payload(request):
-    """把本次调用的 prompt、回复交给 makereport。长度在这里计算，用例只传原始值。"""
+    """把本次调用的 prompt、messages、回复交给 makereport。长度在这里计算，用例只传原始值。"""
 
-    def _record(prompt, response=None, exc=None, **extra):
+    def _record(prompt=None, response=None, exc=None, messages=None, **extra):
         prompt_len = extra.pop("prompt_len") if "prompt_len" in extra else _measured_prompt_len(prompt)
+        messages_len = extra.pop("messages_len") if "messages_len" in extra else _measured_messages_len(messages)
         payload = {
             **extra,
             "prompt": prompt,
             "prompt_len": prompt_len,
+            "messages": messages,
+            "messages_len": messages_len,
             "response": response,
             "response_len": _measured_response_len(response),
         }
@@ -187,21 +195,22 @@ def pytest_runtest_makereport(item, call):
         return
     _test_logger = logging.getLogger("test_run")
     fail_payload_dir = FAIL_PAYLOAD_DIR
-    prompt_len = payload_data["prompt_len"]
-    resp_len = payload_data["response_len"]
+    prompt_len = payload_data.get("prompt_len")
+    messages_len = payload_data.get("messages_len")
+    resp_len = payload_data.get("response_len")
     expected_exception = payload_data.get("expected_exception", "")
 
     if call.excinfo is not None:
         # 用例失败，保存json文件 + 输出错误日志+堆栈
         case_full_name = item.name
         json_path = save_fail_payload(case_full_name, payload_data, fail_payload_dir)
-        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
+        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}")
         _test_logger.error(f"【用例失败】完整请求响应已保存至：{json_path}")
         tb_str = "".join(traceback.format_exception(call.excinfo.type, call.excinfo.value, call.excinfo.tb))
         _test_logger.error(f"异常堆栈信息：\n{tb_str}")
     else:
         # 用例成功：区分普通成功 / 捕获预期异常成功
         if not expected_exception:
-            _test_logger.info(f"【用例执行成功】用例名称：{item.name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
+            _test_logger.info(f"【用例执行成功】用例名称：{item.name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}")
         else:
-            _test_logger.info(f"【用例执行成功（捕获预期异常）】用例名称：{item.name}, prompt长度:{prompt_len}, 返回长度:{resp_len}, 捕获异常：{expected_exception}")
+            _test_logger.info(f"【用例执行成功（捕获预期异常）】用例名称：{item.name}, prompt长度:{prompt_len}, messages长度:{messages_len}, 返回长度:{resp_len}, 捕获异常：{expected_exception}")

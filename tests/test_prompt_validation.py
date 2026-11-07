@@ -78,11 +78,10 @@ def test_mock_chat_prompt_empty(llm_client, mocker, record_payload):
 def test_mock_chat_prompt_structure_invalid(llm_client, mocker, record_payload, prompt, messages, match):
     """Mock用例：prompt 或 messages 结构不合法时本地拦截，不请求远端"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-    shown = messages if messages is not None else prompt
     record_payload(
-        shown,
+        prompt,
         exc="ValueError",
-        prompt_len=len(shown) if isinstance(shown, (str, list)) else None,
+        messages=messages,
     )
     with pytest.raises(ValueError, match=match):
         llm_client.chat(prompt=prompt, messages=messages)
@@ -102,7 +101,7 @@ def test_mock_chat_messages_must_be_odd_count(llm_client, mocker, record_payload
         {"role": "user", "content": "你好"},
         {"role": "assistant", "content": "在吗"},
     ]
-    record_payload(messages, exc="ValueError")
+    record_payload(messages=messages, exc="ValueError")
     with pytest.raises(ValueError, match="messages条数必须为1、3、5……这种单数"):
         llm_client.chat(messages=messages)
     mock_create.assert_not_called()
@@ -138,14 +137,15 @@ def test_mock_chat_prompt_length(llm_client, mocker, record_payload, case_title,
     mock_create.return_value = mocker.Mock(
         choices=[mocker.Mock(message=mocker.Mock(content=reply))]
     )
-    shown = messages if messages is not None else prompt
     too_long = length > MAX_PROMPT_LENGTH
+    length_fields = {"prompt_len": length} if messages is None else {"messages_len": length}
     record_payload(
-        shown,
+        prompt,
         None if too_long else reply,
         exc=r"^prompt长度不能超过" if too_long else None,
-        prompt_len=length,
+        messages=messages,
         case_title=case_title,
+        **length_fields,
     )
     if too_long:
         with pytest.raises(ValueError, match=r"^prompt长度不能超过"):
