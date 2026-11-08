@@ -16,6 +16,9 @@ __pycache__/
 # VSCode编辑器本地配置
 .vscode/
 
+# Cursor本地配置与计划
+.cursor/
+
 # 报告产物
 allure-report/
 allure-results/

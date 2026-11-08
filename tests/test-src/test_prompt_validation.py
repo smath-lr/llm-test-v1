@@ -1,6 +1,6 @@
 import pytest
 
-from utils.llm_client import MAX_PROMPT_LENGTH
+from src.llm_client import MAX_PROMPT_LENGTH
 
 
 # ============ Prompt / messages 输入校验 ============

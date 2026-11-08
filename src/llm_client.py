@@ -106,7 +106,8 @@ def _is_temporary_server_fault(exc) -> bool:
 
 
 def _is_retryable_connection(exc) -> bool:
-    if not isinstance(exc, APIConnectionError):
+    """只认 APIConnectionError 本身。子类 APITimeoutError 不重试。"""
+    if type(exc) is not APIConnectionError:
         return False
     cause = exc.__cause__
     if not isinstance(cause, (RemoteProtocolError, ConnectError)):

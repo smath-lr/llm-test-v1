@@ -4,9 +4,9 @@ import pytest
 from pathlib import Path
 import time
 import json
-from config.config_loader import load_llm_config
+from utils.config_loader import load_llm_config
 from utils import log_helper
-from utils.llm_client import LLMClient
+from src.llm_client import LLMClient
 
 
 # 开启：logging内部handler发生IO错误时抛出异常，不要静默吞掉

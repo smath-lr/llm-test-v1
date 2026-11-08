@@ -167,7 +167,7 @@ def test_mock_chat_response_missing_content(llm_client, mocker, record_payload):
 # ===================== TODO：流式输出，当前chat暂未支持stream，待开发后解除注释 =====================
 # def test_mock_chat_stream_response(llm_client, mocker, record_payload):
 #     """Mock用例：模拟流式输出，返回多个chunk片段
-#     前置依赖：改造 utils.llm_client.chat，增加 stream 参数，支持迭代返回chunk
+#     前置依赖：改造 src.llm_client.chat，增加 stream 参数，支持迭代返回chunk
 #     """
 #     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
 #

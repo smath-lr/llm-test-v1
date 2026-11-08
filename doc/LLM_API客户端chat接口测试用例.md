@@ -58,15 +58,36 @@
 
 | 模块 | 用例 ID | 用例名称 | 优先级 | 前置条件 | 测试步骤 | 预期结果 | 断言 |
 | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
-| 重试与异常请求 | TC-024 | 请求超时触发重试机制失败 3 次 | P0 | Mock 模拟持续返回请求超时异常；配置最大重试次数 2 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置连续失败 3 次，重试耗尽后向外抛出超时异常，mock 函数共调用 3 次 | 捕获 APITimeoutError 异常，mock 函数共调用 3 次 |
-| 重试与异常请求 | TC-025 | 网络连接异常触发重试机制失败 3 次 | P0 | Mock 模拟持续返回网络连接异常；配置最大重试次数 2 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置连续失败 3 次，重试耗尽后向外抛出连接异常，mock 函数共调用 3 次 | 捕获 APIConnectionError 异常，mock 函数共调用 3 次 |
-| 重试与异常请求 | TC-026 | 请求超时触发重试机制第 3 次成功 | P0 | Mock 模拟持续返回请求超时异常；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置连续失败 2 次，第 3 次成功返回模拟响应值，mock 函数共调用 3 次 | 正常返回 mock 模拟的返回文本，mock 函数共调用 3 次 |
-| 重试与异常请求 | TC-027 | 网络连接异常触发重试机制第 3 次成功 | P0 | Mock 模拟持续返回网络连接异常；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置连续失败 2 次，第 3 次成功返回模拟响应值，mock 函数共调用 3 次 | 正常返回 mock 模拟的返回文本，mock 函数共调用 3 次 |
-| 重试与异常请求 | TC-028 | 请求超时触发重试机制第 2 次成功 | P0 | Mock 模拟持续返回请求超时异常；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置失败 1 次，第 2 次成功返回模拟响应值，mock 函数共调用 2 次 | 正常返回 mock 模拟的返回文本，mock 函数共调用 2 次 |
-| 重试与异常请求 | TC-029 | 网络连接异常触发重试机制第 2 次成功 | P0 | Mock 模拟持续返回网络连接异常；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 按照配置失败 1 次，第 2 次成功返回模拟响应值，mock 函数共调用 2 次 | 正常返回 mock 模拟的返回文本，mock 函数共调用 2 次 |
-| 重试与异常请求 | TC-030 | 400 参数错误不执行重试 | P0 | Mock 模拟返回 HTTP 400 响应；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 仅发起 1 次请求，不执行重试，向外抛出对应业务异常 | 捕获 BadRequestError 异常，mock 函数仅调用 1 次 |
-| 重试与异常请求 | TC-031 | 429 限流不执行重试 | P0 | Mock 模拟返回 HTTP 429 响应；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 仅发起 1 次请求，不执行重试，向外抛出对应业务异常 | 捕获 RateLimitError 异常，mock 函数仅调用 1 次 |
-| 重试与异常请求 | TC-032 | 500 服务不可用不执行重试 | P0 | Mock 模拟返回 HTTP 500 响应；配置最大重试次数 3 次，sleep 时间 1s | 1. 使用合法 prompt 调用 `chat()` | 仅发起 1 次请求，不执行重试，向外抛出对应业务异常 | 捕获 InternalServerError 异常，mock 函数仅调用 1 次 |
+| 重试与异常请求 | TC-041 | 400 参数错误不重试 | P0 | Mock 模拟 HTTP 400，异常为 BadRequestError | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的参数错误 | 捕获 BadRequestError，状态码 400，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-054 | 401 认证失败不重试 | P0 | Mock 模拟 HTTP 401，异常为 AuthenticationError | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的认证错误 | 捕获 AuthenticationError，状态码 401，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-055 | 403 无权限不重试 | P0 | Mock 模拟 HTTP 403，异常为 PermissionDeniedError | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的权限错误 | 捕获 PermissionDeniedError，状态码 403，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-056 | 404 资源不存在不重试 | P0 | Mock 模拟 HTTP 404，异常为 NotFoundError | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的未找到错误 | 捕获 NotFoundError，状态码 404，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-042 | 429 没有 Retry-After 不重试 | P0 | Mock 模拟 HTTP 429 的 RateLimitError，响应头没有 Retry-After | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的限流错误 | 捕获 RateLimitError，状态码 429，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-057 | 429 的 Retry-After 为空白不重试 | P0 | Mock 模拟 RateLimitError，Retry-After 为空白 | 1. 使用合法 prompt 调用 `chat()` | 空白头视为没有，只请求 1 次 | 捕获 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-058 | 429 的 Retry-After 无法解析不重试 | P0 | Mock 模拟 RateLimitError，Retry-After 为非数字 | 1. 使用合法 prompt 调用 `chat()` | 解析失败视为没有，只请求 1 次 | 捕获 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-059 | 429 的 Retry-After 为负数不重试 | P0 | Mock 模拟 RateLimitError，Retry-After 为负数 | 1. 使用合法 prompt 调用 `chat()` | 负数视为没有，只请求 1 次 | 捕获 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-060 | 429 的 Retry-After 为过去的日期不重试 | P0 | Mock 模拟 RateLimitError，Retry-After 为过去的 HTTP 日期 | 1. 使用合法 prompt 调用 `chat()` | 解析出的秒数为负，视为没有，只请求 1 次 | 捕获 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-061 | 429 但不是 RateLimitError 不重试 | P0 | Mock 模拟状态码 429，异常不是 RateLimitError，没有 Retry-After | 1. 使用合法 prompt 调用 `chat()` | 没有可用的 Retry-After，只请求 1 次 | 捕获原来的异常，状态码 429，且不是 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-062 | 500 的 body 不是字典不重试 | P0 | Mock 模拟 HTTP 500 的 InternalServerError，body 不是字典 | 1. 使用合法 prompt 调用 `chat()` | 无法识别临时故障，只请求 1 次 | 捕获 InternalServerError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-063 | 500 的 type 和 code 都未命中不重试 | P0 | Mock 模拟 HTTP 500 的 InternalServerError，body 为字典，type 和 code 都是临时故障集合外的字符串 | 1. 使用合法 prompt 调用 `chat()` | 未命中临时故障，只请求 1 次 | 捕获 InternalServerError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-043 | 500 的 code 为整数不重试 | P0 | Mock 模拟 HTTP 500，body 的 code 为整数 500 | 1. 使用合法 prompt 调用 `chat()` | 未识别为临时故障，只请求 1 次 | 捕获 InternalServerError，状态码 500，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-044 | 500 只在 message 里出现临时故障文案不重试 | P0 | Mock 模拟 HTTP 500，message 为 server_error，type 和 code 都不是临时故障字符串 | 1. 使用合法 prompt 调用 `chat()` | 不看 message 文案，只请求 1 次 | 捕获 InternalServerError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-064 | 500 但类型不是 InternalServerError 不重试 | P0 | Mock 模拟状态码 500，异常不是 InternalServerError，body 含 server_error | 1. 使用合法 prompt 调用 `chat()` | 类型不符，不看 body，只请求 1 次 | 捕获原来的异常，状态码 500，且不是 InternalServerError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-065 | APITimeoutError 没有 cause 不重试 | P0 | Mock 模拟 APITimeoutError，没有 cause | 1. 使用合法 prompt 调用 `chat()` | 超时一律不重试，只请求 1 次 | 捕获 APITimeoutError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-047 | APITimeoutError 的 cause 为 ConnectTimeout 不重试 | P0 | Mock 模拟 APITimeoutError，cause 为 ConnectTimeout | 1. 使用合法 prompt 调用 `chat()` | 超时一律不重试，只请求 1 次 | 捕获 APITimeoutError，cause 为 ConnectTimeout，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-045 | APITimeoutError 的 cause 为 ReadTimeout 不重试 | P0 | Mock 模拟 APITimeoutError，cause 为 ReadTimeout | 1. 使用合法 prompt 调用 `chat()` | 超时一律不重试，只请求 1 次 | 捕获 APITimeoutError，cause 为 ReadTimeout，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-066 | APITimeoutError 的 cause 为 ConnectError 不重试 | P0 | Mock 模拟 APITimeoutError，cause 为 ConnectError | 1. 使用合法 prompt 调用 `chat()` | 超时一律不重试，不看来源，只请求 1 次 | 捕获 APITimeoutError，cause 为 ConnectError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-067 | APITimeoutError 的 cause 为 RemoteProtocolError 不重试 | P0 | Mock 模拟 APITimeoutError，cause 为 RemoteProtocolError | 1. 使用合法 prompt 调用 `chat()` | 超时一律不重试，不看来源，只请求 1 次 | 捕获 APITimeoutError，cause 为 RemoteProtocolError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-068 | APIConnectionError 没有 cause 不重试 | P0 | Mock 模拟 APIConnectionError，没有 cause | 1. 使用合法 prompt 调用 `chat()` | 没有可重试的 cause，只请求 1 次 | 捕获 APIConnectionError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-069 | APIConnectionError 的 cause 为 ConnectTimeout 不重试 | P0 | Mock 模拟 APIConnectionError，cause 为 ConnectTimeout | 1. 使用合法 prompt 调用 `chat()` | ConnectTimeout 不是 ConnectError，只请求 1 次 | 捕获 APIConnectionError，cause 为 ConnectTimeout，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-046 | DNS 失败不重试 | P0 | Mock 模拟 APIConnectionError，cause 为 ConnectError，文本含 nodename nor servname provided | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的连接错误 | 捕获 APIConnectionError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-070 | 另一种 DNS 文案不重试 | P0 | Mock 模拟 APIConnectionError，cause 为 ConnectError，文本含 name or service not known | 1. 使用合法 prompt 调用 `chat()` | 只请求 1 次，抛出原来的连接错误 | 捕获 APIConnectionError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-048 | 500 临时故障连续失败 3 次 | P0 | Mock 模拟 HTTP 500，body 的 type 为 server_error；抖动固定为 0 | 1. 使用合法 prompt 调用 `chat()` | 重试 2 次后仍失败，抛出原来的服务端错误 | 捕获 InternalServerError，mock 函数调用 3 次；客户端的 model、temperature、max_tokens、timeout 仍为配置值 |
+| 重试与异常请求 | TC-049 | 429 的 Retry-After 超过预算不重试 | P0 | Mock 模拟 HTTP 429，Retry-After 为 30 秒 | 1. 使用合法 prompt 调用 `chat()` | 剩余时间盖不住 30 秒再加 2 秒，睡眠前抛出原来的限流错误 | 捕获 RateLimitError，mock 函数调用 1 次 |
+| 重试与异常请求 | TC-050 | 500 临时故障失败 1 次后成功 | P0 | Mock 先返回 type 为 server_error 的 500，再返回正常文本；抖动固定为 0 | 1. 使用合法 prompt 调用 `chat()` | 第 2 次返回模拟文本 | 返回 mock 文本「重试后成功」，mock 函数调用 2 次；客户端的 model、temperature、max_tokens、timeout 仍为配置值 |
+| 重试与异常请求 | TC-051 | 500 临时故障失败 2 次后成功 | P0 | Mock 连续两次返回 type 为 server_error 的 500，第 3 次返回正常文本；抖动固定为 0 | 1. 使用合法 prompt 调用 `chat()` | 第 3 次返回模拟文本 | 返回 mock 文本「重试后成功」，mock 函数调用 3 次 |
+| 重试与异常请求 | TC-052 | 429 带 Retry-After 0 失败 1 次后成功 | P0 | Mock 先返回带 Retry-After 0 的 429，再返回正常文本 | 1. 使用合法 prompt 调用 `chat()` | 按头里的 0 秒等待后，第 2 次返回模拟文本 | 返回 mock 文本「重试后成功」，mock 函数调用 2 次 |
+| 重试与异常请求 | TC-053 | 429 带 Retry-After 0 失败 2 次后成功 | P0 | Mock 连续两次返回带 Retry-After 0 的 429，第 3 次返回正常文本 | 1. 使用合法 prompt 调用 `chat()` | 第 3 次返回模拟文本 | 返回 mock 文本「重试后成功」，mock 函数调用 3 次 |
 
 ## 模块四：服务端响应解析
 
