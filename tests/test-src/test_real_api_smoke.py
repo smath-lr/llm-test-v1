@@ -7,10 +7,16 @@ from utils.config_loader import MASKED_API_KEY, load_llm_config
 
 @pytest.mark.real_api
 def test_tc088_masked_api_key_passthrough(llm_client, llm_config):
-    """TC-088：请求头里的密钥只和打码值比较，不读取环境变量。"""
+    """TC-088：配置中的 api_key 是打码值，请求头携带环境变量中的原文。"""
     header = llm_client.client.auth_headers.get("Authorization")
-    assert header == f"Bearer {MASKED_API_KEY}"
+    env_api_key = os.getenv("DEEPSEEK_API_KEY")
+    header_ok = (
+        bool(env_api_key)
+        and env_api_key != MASKED_API_KEY
+        and header == f"Bearer {env_api_key}"
+    )
     assert llm_config["api_key"] == MASKED_API_KEY
+    assert header_ok, "请求头应携带环境变量中的密钥"
 
 
 @pytest.mark.real_api

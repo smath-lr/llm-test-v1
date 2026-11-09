@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 import time
 import json
-from utils.config_loader import load_llm_config
+from utils.config_loader import load_llm_config, read_api_key
 from utils import log_helper
 from src.llm_client import LLMClient
 
@@ -55,8 +55,8 @@ def mock_api_key():
 
 @pytest.fixture(scope="session")
 def llm_client_real(llm_config):
-    """session：真实 api_key，real_api 用例共用"""
-    yield _build_llm_client(llm_config, llm_config["api_key"])
+    """session：真实 api_key，real_api 用例共用。配置字典里仍是打码值。"""
+    yield _build_llm_client(llm_config, read_api_key())
 
 
 @pytest.fixture(scope="session")
