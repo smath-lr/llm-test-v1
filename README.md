@@ -1,5 +1,5 @@
 # LLM API 自动化测试练习
-基于pytest实现大模型API自动化测试项目，用于验证LLM基础能力、边界输入、安全能力。
+基于 pytest 实现大模型 API 客户端自动化测试，覆盖输入校验、请求参数、重试、响应解析和少量真实 API 冒烟。
 
 ## 技术栈
 - Python 3.10
@@ -14,7 +14,7 @@
 ```bash
 llm-test-v1
 ├── config/                  # 只放配置文件。密钥在根目录 .env
-│   └── config.yaml          # 本地配置：地址、模型、超时等
+│   └── config.yaml          # 本地配置：地址、模型、超时、temperature、max_tokens
 ├── logs/                    # 自动生成，存放运行日志与失败报文，.gitignore 忽略
 │   ├── fail_payload/        # 保存测试失败时的完整 payload json 报文
 │   ├── llm_client.log       # LLM 业务调用日志
@@ -22,12 +22,13 @@ llm-test-v1
 ├── doc/                     # 项目文档、截图（Allure报告截图存放于此，可提交git）
 │   ├── allure_report.png
 │   ├── LLM_API客户端chat接口测试用例.md
-│   └── LLM_API客户端测试计划.md
+│   ├── LLM_API客户端测试计划.md
+│   └── LLM_API客户端测试设计.md
 ├── src/                     # 被测源码
 │   ├── __init__.py
-│   └── llm_client.py        # LLM 客户端封装（LLMClient 类：chat 等能力封装，含重试装饰器）
+│   └── llm_client.py        # LLM 客户端封装（LLMClient.chat，含重试）
 ├── utils/                   # 公共工具，不放被测对象
-│   ├── config_loader.py     # 读取 config.yaml，并从 .env 取 API 密钥
+│   ├── config_loader.py     # 读取 config.yaml；从 .env 读取密钥，对外只返回打码值 ***
 │   └── log_helper.py        # 日志辅助模块：logger、handler 统一创建与配置
 ├── tests/                   # pytest 测试用例集合
 │   ├── conftest.py                  # pytest 全局钩子、logger fixture、llm_client 实例 fixture、失败报文保存逻辑
@@ -44,7 +45,9 @@ llm-test-v1
 └── .gitignore
 ```
 
-> 重要提示：`allure-results/`、`allure-report/`、`logs/`、`.env` 均配置在 `.gitignore`，不会提交到远端仓库。API 密钥只放在 `.env`，`config/config.yaml` 只放地址、模型和超时等非密钥配置。`doc/allure_report.png` 为手动保存的报告截图，用于项目展示，可以提交 git。
+> 重要提示：`allure-results/`、`allure-report/`、`logs/`、`.env` 均配置在 `.gitignore`，不会提交到远端仓库。API 密钥原文只放在 `.env`。`load_llm_config()` 对外返回的 `api_key` 是打码值 `***`。`config/config.yaml` 只放地址、模型、超时、temperature、max_tokens 等非密钥配置。`doc/allure_report.png` 为手动保存的报告截图，用于项目展示，可以提交 git。
+
+文档分工：`doc/LLM_API客户端测试计划.md` 写目标、范围、优先级、风险、验收和排期；`doc/LLM_API客户端测试设计.md` 写参数、固定值和重试规则；`doc/LLM_API客户端chat接口测试用例.md` 写可执行用例和断言。
 
 ## 环境安装
 建议先创建并激活 Python 虚拟环境，再安装 Python 依赖
@@ -74,7 +77,7 @@ allure --version
 ## 执行测试
 > 推荐统一使用 `python -m pytest` 写法，规避 Windows 下 pytest 环境错乱问题。
 
-常规执行，只在失败时输出控制台信息
+常规执行会列出每条用例结果。`pytest.ini` 的 `addopts` 已经带有 `-v`。
 `-v`：verbose，展示每条用例执行结果
 ```powershell
 python -m pytest tests/ -v
@@ -104,16 +107,12 @@ python -m pytest -v -m real_api
 | `real_api` | 真实调用 LLM 接口，会产生 token 消耗 |
 
 ## 测试覆盖范围
-1. **基础冒烟测试**：验证大模型正常返回、基础问答、安全内容拒绝
-2. **API返回校验**：真实请求校验正常返回值类型；mock 模拟空 choices 场景、服务 500 异常场景，验证异常捕获逻辑，mock 用例无需联网、不消耗 token
-3. **边界用例**：参数化校验 Prompt 长度边界，覆盖最短有效输入、上限临界值、超限场景；验证超长 prompt 会触发参数校验异常
-4. **等价类测试**：采用参数化，划分有效、无效等价类。有效类包含普通中文、特殊字符 + emoji；无效类覆盖空串、None、纯空白字符串、超长文本，校验输入合法性判断逻辑。
-5. **真实 API 冒烟（tests/test-src/test_real_api_smoke.py）**
-    - 真实密钥透传、单轮问答、有害提问拒绝、JSON 输出、超短超时。
-6. **Mock 模拟测试**
-    - 输入校验、请求透传、异常不重试、响应解析，基于 `pytest-mock`，不联网、不消耗 token。
-7. **重试逻辑测试**
-    - 429 带可解析的 Retry-After、500 的临时故障码会重试，最多 3 次，并受 25 秒预算约束。502/504 走抖动，503 优先用 Retry-After。连接重试只认 APIConnectionError 本身；APITimeoutError 和 DNS 失败不重试。
+1. **输入校验**：空串、None、纯空白、超长等无效输入在发请求前拒绝。长度覆盖 1、2、199、200、201，超长触发参数校验异常。
+2. **请求参数**：单轮、多轮 `messages` 按预期传递。默认参数来自配置。调用时可以改写 `model`、`temperature`、`max_tokens`、`timeout`。
+3. **响应解析**：正常文本原样返回。没有 `choices`、`choices` 不是列表、空 `choices`、缺少 `message` 或 `content`、`content` 为空字符串、纯空白或不是字符串时抛出异常，并且不重试。
+4. **重试**：429 带可解析的 Retry-After、500 的临时故障码会重试，最多 3 次，并受 25 秒预算约束；预算不足则停止。502/504 走抖动，503 优先用 Retry-After。连接重试只认 `APIConnectionError` 本身；`APITimeoutError` 和 DNS 失败不重试。
+5. **真实 API 冒烟**（`tests/test-src/test_real_api_smoke.py`）：打码密钥透传（请求头为 `Bearer ***`，配置中的 `api_key` 为 `***`）；单轮「23乘45等于多少」，回答含「1035」；多轮把 good morning 翻译成中文，回答含「早上好」；密钥缺失或空字符串在加载配置时拦住。不测有害提问。
+6. **Mock**：输入校验、请求透传、重试与不重试、响应解析，基于 `pytest-mock`，不联网、不消耗 token。
 
 ## Allure测试报告
 ### 1、生成原始结果（需要激活虚拟环境）

@@ -47,7 +47,7 @@
 | 请求组装与参数透传 | TC-032 | 单轮对话 messages 组装 | P0 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(prompt="简单介绍自动化测试")` | 请求中 messages 为一条 user 消息，content 等于原 prompt，正常发起请求 | 返回 mock 文本「单轮参数传递成功」，mock 函数调用 1 次；messages 仅 1 条，且只含 role、content，role 为 user，content 等于原 prompt |
 | 请求组装与参数透传 | TC-033 | 多轮对话 messages 原样传递 | P0 | Mock 模拟 DeepSeek 正常响应 | 1. 传入 user、assistant、user 三条消息，调用 `chat(messages=...)` | 请求中的角色、顺序、内容与入参一致，正常发起请求 | 返回 mock 文本「多轮参数传递成功」，mock 函数调用 1 次；每条只含 role、content，角色、顺序、内容与入参一致 |
 | 请求组装与参数透传 | TC-034 | 默认请求参数与假 api_key | P0 | Mock 模拟 DeepSeek 正常响应 | 1. 不改写参数，调用 `chat(prompt="校验默认请求参数")` | model、temperature、max_tokens、timeout、base_url 使用配置值，api_key 使用假密钥 | 返回 mock 文本「默认参数传递成功」，mock 函数调用 1 次；上述五项等于配置，api_key 等于假密钥且不等于环境变量中的真实密钥。不断言 messages |
-| 请求组装与参数透传 | TC-035 | 只改写 model | P1 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(prompt="校验改写后的请求参数", model="mock-model")` | 请求使用新 model，其余请求参数仍用配置 | 返回 mock 文本「改写参数传递成功」，mock 函数调用 1 次；model 等于新值且不等于配置，temperature、max_tokens、timeout 仍等于配置；客户端实例上的这四项保持配置值 |
+| 请求组装与参数透传 | TC-035 | 只改写 model | P0 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(prompt="校验改写后的请求参数", model="mock-model")` | 请求使用新 model，其余请求参数仍用配置 | 返回 mock 文本「改写参数传递成功」，mock 函数调用 1 次；model 等于新值且不等于配置，temperature、max_tokens、timeout 仍等于配置；客户端实例上的这四项保持配置值 |
 | 请求组装与参数透传 | TC-036 | 只改写 temperature | P1 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(..., temperature=0.2)` | 请求使用新 temperature，其余请求参数仍用配置 | 返回 mock 文本「改写参数传递成功」，mock 函数调用 1 次；temperature 等于 0.2 且不等于配置，其余三项仍等于配置；客户端实例上的这四项保持配置值 |
 | 请求组装与参数透传 | TC-037 | 只改写 max_tokens | P1 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(..., max_tokens=128)` | 请求使用新 max_tokens，其余请求参数仍用配置 | 返回 mock 文本「改写参数传递成功」，mock 函数调用 1 次；max_tokens 等于 128 且不等于配置，其余三项仍等于配置；客户端实例上的这四项保持配置值 |
 | 请求组装与参数透传 | TC-038 | 只改写 timeout | P1 | Mock 模拟 DeepSeek 正常响应 | 1. 调用 `chat(..., timeout=8)` | 请求使用新 timeout，其余请求参数仍用配置 | 返回 mock 文本「改写参数传递成功」，mock 函数调用 1 次；timeout 等于 8 且不等于配置，其余三项仍等于配置；客户端实例上的这四项保持配置值 |
@@ -106,7 +106,7 @@
 | 服务端响应解析 | TC-081 | 响应解析：choices 为空列表时抛出 RuntimeError，不重试 | P0 | Mock 返回 choices 为空列表 | 1. 调用 `chat("返回空choices")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「API 返回空choices」，mock 函数调用 1 次 |
 | 服务端响应解析 | TC-082 | 响应解析：第一条 choice 缺少 message 时抛出 RuntimeError，不重试 | P0 | Mock 返回的第一条 choice 没有 message 属性 | 1. 调用 `chat("返回缺少message")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「响应缺少message」，mock 函数调用 1 次 |
 | 服务端响应解析 | TC-083 | 响应解析：message 缺少 content 属性时抛出 RuntimeError，不重试 | P0 | Mock 返回的 message 没有 content 属性 | 1. 调用 `chat("返回缺少content")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「响应缺少content」，mock 函数调用 1 次 |
-| 服务端响应解析 | TC-084 | 返回空字符串 | P1 | Mock 返回一条 content 为空字符串的 choices | 1. 调用 `chat("返回空结果")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「content必须为去空格后非空的字符串」，mock 函数调用 1 次 |
+| 服务端响应解析 | TC-084 | 返回空字符串 | P0 | Mock 返回一条 content 为空字符串的 choices | 1. 调用 `chat("返回空结果")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「content必须为去空格后非空的字符串」，mock 函数调用 1 次 |
 | 服务端响应解析 | TC-085 | 返回空白字符 | P1 | Mock 返回一条 content 只含空格、换行和制表符的 choices | 1. 调用 `chat("返回空白")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「content必须为去空格后非空的字符串」，mock 函数调用 1 次 |
 | 服务端响应解析 | TC-086 | 响应解析：content 为整数时抛出 RuntimeError，不重试 | P0 | Mock 返回的 content 为整数 1 | 1. 调用 `chat("content不是字符串")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「content必须为去空格后非空的字符串」，mock 函数调用 1 次 |
 | 服务端响应解析 | TC-087 | 响应解析：content 为 None 时抛出 RuntimeError，不重试 | P0 | Mock 返回的 content 为 None | 1. 调用 `chat("content不是字符串")` | 抛出 RuntimeError，不重试 | 捕获 RuntimeError，文案为「content必须为去空格后非空的字符串」，mock 函数调用 1 次 |
