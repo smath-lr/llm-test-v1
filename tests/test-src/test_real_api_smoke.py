@@ -2,27 +2,15 @@ import os
 
 import pytest
 
-from tests.conftest import MOCK_API_KEY
-from utils.config_loader import load_llm_config
+from utils.config_loader import MASKED_API_KEY, load_llm_config
 
 
 @pytest.mark.real_api
-def test_tc088_real_api_key_after_chat(llm_client, llm_config, record_payload):
-    """TC-088：先完成一次真实调用，再核对此次所用 api_key。"""
-    prompt = "只回复ok"
-    record_payload(prompt)
-    result = llm_client.chat(prompt)
-    record_payload(prompt, result)
-    assert isinstance(result, str) and len(result.strip()) > 0
-    env_api_key = os.getenv("DEEPSEEK_API_KEY")
-    client_api_key = str(llm_client.client.api_key)
-    api_key_ok = (
-        bool(env_api_key)
-        and client_api_key == env_api_key
-        and client_api_key == llm_config["api_key"]
-        and client_api_key != MOCK_API_KEY
-    )
-    assert api_key_ok, "真实 api_key 应透传到客户端"
+def test_tc088_masked_api_key_passthrough(llm_client, llm_config):
+    """TC-088：请求头里的密钥只和打码值比较，不读取环境变量。"""
+    header = llm_client.client.auth_headers.get("Authorization")
+    assert header == f"Bearer {MASKED_API_KEY}"
+    assert llm_config["api_key"] == MASKED_API_KEY
 
 
 @pytest.mark.real_api

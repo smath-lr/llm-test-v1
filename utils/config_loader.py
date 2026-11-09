@@ -3,6 +3,17 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
+# 读到真实密钥后立刻换成这个打码值，下游只拿得到它
+MASKED_API_KEY = "***"
+
+
+def _read_masked_api_key():
+    """读取环境变量中的密钥。缺失或空字符串抛错，有效时只返回打码值。"""
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    if api_key is None or api_key == "":
+        raise ValueError("环境变量 DEEPSEEK_API_KEY 未配置")
+    return MASKED_API_KEY
+
 
 # ============ 获取大模型配置信息 ============
 def load_llm_config():
@@ -19,9 +30,6 @@ def load_llm_config():
         raise FileNotFoundError(f"配置文件不存在！路径：{CONFIG_PATH}")
 
     cfg = config["deepseek"]
-    # 在这里判断密钥。缺失或空字符串直接失败，调用方不会拿到配置，也就不会创建客户端或发请求
-    api_key = os.getenv("DEEPSEEK_API_KEY")
-    if api_key is None or api_key == "":
-        raise ValueError("环境变量 DEEPSEEK_API_KEY 未配置")
-    cfg["api_key"] = api_key
+    # 对外只放入打码值，原始密钥不离开 _read_masked_api_key
+    cfg["api_key"] = _read_masked_api_key()
     return cfg
