@@ -28,34 +28,8 @@ def test_mock_chat_normal_text(llm_client, mocker, valid_prompt, record_payload)
 
 
 @pytest.mark.mock
-def test_mock_chat_return_json(llm_client, mocker, record_payload):
-    """Mock用例1：模拟LLM返回json字符串，测试json解析链路"""
-    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-
-    mock_response = mocker.Mock(
-        choices=[
-            mocker.Mock(
-                message=mocker.Mock(
-                    content='{"name":"莉莉","skill":"测试与内观"}'
-                )
-            )
-        ]
-        )
-    mock_create.return_value = mock_response
-
-    prompt = "请输出JSON格式信息"
-    record_payload(prompt)
-    result = llm_client.chat(prompt)
-    record_payload(prompt, result)
-    resp_result = json.loads(result)
-    assert resp_result["name"] == "莉莉"
-    assert resp_result["skill"] == "测试与内观"
-    mock_create.assert_called_once()
-
-
-@pytest.mark.mock
 def test_mock_chat_empty_content(llm_client, mocker, record_payload):
-    """Mock用例：模拟LLM返回空字符串，校验上层chat函数处理空返回"""
+    """Mock用例：模拟LLM返回空字符串，校验chat拒绝并只请求一次"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
         choices=[
@@ -67,17 +41,16 @@ def test_mock_chat_empty_content(llm_client, mocker, record_payload):
     mock_create.return_value = mock_response
 
     prompt = "返回空结果"
-    record_payload(prompt)
-    result = llm_client.chat(prompt)
-    record_payload(prompt, result)
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="content必须为去空格后非空的字符串"):
+        llm_client.chat(prompt)
 
-    assert result == ""
     mock_create.assert_called_once()
 
 
 @pytest.mark.mock
 def test_mock_chat_whitespace_content(llm_client, mocker, record_payload):
-    """Mock用例：模拟LLM只返回空格、换行这类空白字符"""
+    """Mock用例：模拟LLM只返回空格、换行这类空白字符，校验chat拒绝并只请求一次"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
         choices=[
@@ -89,51 +62,93 @@ def test_mock_chat_whitespace_content(llm_client, mocker, record_payload):
     mock_create.return_value = mock_response
 
     prompt = "返回空白"
-    record_payload(prompt)
-    result = llm_client.chat(prompt)
-    record_payload(prompt, result)
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="content必须为去空格后非空的字符串"):
+        llm_client.chat(prompt)
 
-    assert result.isspace()
     mock_create.assert_called_once()
 
 
-test_case_list = [
-    ("简单问候", "你好呀", "你好呀"),
-    ("数字返回", "输出数字123", "123"),
-    ("英文返回", "输出hello", "hello world"),
-]
 @pytest.mark.mock
-@pytest.mark.parametrize("case_title, prompt, expect_text", test_case_list)
-def test_mock_chat_parametrize(llm_client, mocker, record_payload, case_title, prompt, expect_text):
-    """Mock综合用例：参数化批量模拟多种正常返回，减少重复样板代码"""
+@pytest.mark.parametrize("content", [1, None], ids=["整数", "None"])
+def test_mock_chat_content_not_string(llm_client, mocker, record_payload, content):
+    """Mock用例：content 不是字符串，校验 chat 拒绝并只请求一次"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(
         choices=[
             mocker.Mock(
-                message=mocker.Mock(content=expect_text)
+                message=mocker.Mock(content=content)
             )
         ]
     )
     mock_create.return_value = mock_response
 
-    record_payload(prompt, case_title=case_title)
-    result = llm_client.chat(prompt)
-    record_payload(prompt, result, case_title=case_title)
+    prompt = "content不是字符串"
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="content必须为去空格后非空的字符串"):
+        llm_client.chat(prompt)
 
-    assert result == expect_text
     mock_create.assert_called_once()
 
 
 @pytest.mark.mock
 def test_mock_chat_response_empty_choices(llm_client, mocker, valid_prompt, record_payload):
-    """Mock用例：返回空choices，校验chat容错逻辑"""
+    """Mock用例：返回空choices，抛出 RuntimeError 且不重试"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     mock_response = mocker.Mock(choices=[])
     mock_create.return_value = mock_response
 
     prompt = "返回空choices"
     record_payload(prompt, exc="RuntimeError")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="API 返回空choices"):
+        llm_client.chat(prompt)
+
+    mock_create.assert_called_once()
+
+
+@pytest.mark.mock
+def test_mock_chat_response_missing_choices(llm_client, mocker, record_payload):
+    """Mock用例：返回结果没有 choices 属性，抛出 RuntimeError 且不重试"""
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    mock_create.return_value = mocker.Mock(spec=[])
+
+    prompt = "返回结果没有choices"
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="返回结果没有choices属性"):
+        llm_client.chat(prompt)
+
+    mock_create.assert_called_once()
+
+
+@pytest.mark.mock
+def test_mock_chat_response_choices_not_list(llm_client, mocker, record_payload):
+    """Mock用例：choices 能取到但不是列表，抛出 RuntimeError 且不重试"""
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    mock_response = mocker.Mock(choices={"content": "你好"})
+    mock_create.return_value = mock_response
+
+    prompt = "choices不是列表"
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="choices必须为列表"):
+        llm_client.chat(prompt)
+
+    mock_create.assert_called_once()
+
+
+@pytest.mark.mock
+def test_mock_chat_response_missing_message(llm_client, mocker, record_payload):
+    """Mock用例：第一条 choice 取不到 message，抛出 RuntimeError 且不重试"""
+    mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
+    mock_response = mocker.Mock(
+        choices=[
+            mocker.Mock(spec=[])
+        ]
+    )
+    mock_create.return_value = mock_response
+
+    prompt = "返回缺少message"
+    record_payload(prompt, exc="RuntimeError")
+    with pytest.raises(RuntimeError, match="响应缺少message"):
         llm_client.chat(prompt)
 
     mock_create.assert_called_once()
@@ -141,7 +156,7 @@ def test_mock_chat_response_empty_choices(llm_client, mocker, valid_prompt, reco
 
 @pytest.mark.mock
 def test_mock_chat_response_missing_content(llm_client, mocker, record_payload):
-    """Mock用例：返回结构残缺，message对象不存在content属性，校验chat容错逻辑"""
+    """Mock用例：message 上取不到 content，抛出 RuntimeError 且不重试"""
     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
     # 重点：message这个mock对象，不设置content
     mock_response = mocker.Mock(
@@ -153,37 +168,11 @@ def test_mock_chat_response_missing_content(llm_client, mocker, record_payload):
     )
     mock_create.return_value = mock_response
 
-    prompt = "返回残缺结构"
-    record_payload(prompt, exc="AttributeError")
+    prompt = "返回缺少content"
+    record_payload(prompt, exc="RuntimeError")
 
-    # 预期：访问message.content时抛属性不存在异常
-    with pytest.raises(AttributeError):
+    with pytest.raises(RuntimeError, match="响应缺少content"):
         llm_client.chat(prompt)
 
     mock_create.assert_called_once()
 
-
-# @pytest.mark.mock
-# ===================== TODO：流式输出，当前chat暂未支持stream，待开发后解除注释 =====================
-# def test_mock_chat_stream_response(llm_client, mocker, record_payload):
-#     """Mock用例：模拟流式输出，返回多个chunk片段
-#     前置依赖：改造 src.llm_client.chat，增加 stream 参数，支持迭代返回chunk
-#     """
-#     mock_create = mocker.patch("openai.resources.chat.completions.Completions.create")
-#
-#     # 构造流式迭代器，每一块是一个chunk对象
-#     chunk_1 = mocker.Mock(choices=[mocker.Mock(delta=mocker.Mock(content="你好"))])
-#     chunk_2 = mocker.Mock(choices=[mocker.Mock(delta=mocker.Mock(content="，这是流式"))])
-#     chunk_3 = mocker.Mock(choices=[mocker.Mock(delta=mocker.Mock(content="测试"))])
-#
-#     mock_create.return_value = iter([chunk_1, chunk_2, chunk_3])
-#
-#     prompt = "流式输出"
-#     record_payload(prompt)
-#     result_stream = llm_client.chat(prompt, stream=True)
-#     full_text = "".join([chunk.choices[0].delta.content for chunk in result_stream])
-#     record_payload(prompt, full_text)
-#
-#     assert full_text == "你好，这是流式测试"
-#     mock_create.assert_called_once()
-# ==============================================================================================

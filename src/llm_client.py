@@ -303,11 +303,35 @@ class LLMClient:
             timeout=self.timeout if timeout is None else timeout
         )
 
-        # API返回结果校验
-        if not resp.choices:
+        # API返回结果校验。只看第一条 choice，取不到或对不上就说明原因，不重试
+        try:
+            choices = resp.choices
+        except AttributeError:
+            self.biz_logger.error("返回结果没有choices属性")
+            raise RuntimeError("返回结果没有choices属性")
+        if not isinstance(choices, list):
+            self.biz_logger.error("choices必须为列表")
+            raise RuntimeError("choices必须为列表")
+        if len(choices) == 0:
             self.biz_logger.error("API 返回空choices")
             raise RuntimeError("API 返回空choices")
-        
+
+        try:
+            message = choices[0].message
+        except AttributeError:
+            self.biz_logger.error("响应缺少message")
+            raise RuntimeError("响应缺少message")
+
+        try:
+            content = message.content
+        except AttributeError:
+            self.biz_logger.error("响应缺少content")
+            raise RuntimeError("响应缺少content")
+
+        if not isinstance(content, str) or len(content.strip()) == 0:
+            self.biz_logger.error("content必须为去空格后非空的字符串")
+            raise RuntimeError("content必须为去空格后非空的字符串")
+
         self.biz_logger.info("API 调用成功")
-        return resp.choices[0].message.content
+        return content
     
