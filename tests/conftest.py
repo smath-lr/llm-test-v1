@@ -4,7 +4,8 @@ import pytest
 from pathlib import Path
 import time
 import json
-from utils.config_loader import load_llm_config, read_api_key
+import yaml
+from utils.config_loader import MASKED_API_KEY, load_llm_config, read_api_key
 from utils import log_helper
 from src.llm_client import LLMClient
 
@@ -35,40 +36,53 @@ def _build_llm_client(cfg, api_key):
 def valid_prompt():
     """fixture：复用的合法prompt，所有用例可以直接调用"""
     return "简单介绍自动化测试"
-@pytest.fixture
-def max_length_prompt():
-    """fixture：刚好达到上限长度prompt"""
-    return "a"*200
+
+
+def _use_real_client(request):
+    return request.node.get_closest_marker("real_api") is not None or request.node.get_closest_marker("mock") is None
 
 
 @pytest.fixture(scope="session")
-def llm_config():
-    """整个会话只加载一次配置，用例和客户端共用这一份"""
+def llm_config_real():
+    """session：真实配置。load_llm_config 会校验密钥，返回值里的 api_key 仍是打码值。"""
     return load_llm_config()
 
 
 @pytest.fixture(scope="session")
-def mock_api_key():
-    """session：假密钥变量，mock 客户端和用例共用"""
-    return MOCK_API_KEY
+def llm_config_mock():
+    """session：只读 yaml，不读密钥。api_key 填打码值。"""
+    config_path = BASE_DIR / "config" / "config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    cfg = config["deepseek"]
+    cfg["api_key"] = MASKED_API_KEY
+    return cfg
+
+
+@pytest.fixture
+def llm_config(request):
+    """按标记只取一份 session 配置：real_api、双标记、未打标走真实配置，仅 mock 走 yaml。"""
+    if _use_real_client(request):
+        return request.getfixturevalue("llm_config_real")
+    return request.getfixturevalue("llm_config_mock")
 
 
 @pytest.fixture(scope="session")
-def llm_client_real(llm_config):
+def llm_client_real(llm_config_real):
     """session：真实 api_key，real_api 用例共用。配置字典里仍是打码值。"""
-    yield _build_llm_client(llm_config, read_api_key())
+    yield _build_llm_client(llm_config_real, read_api_key())
 
 
 @pytest.fixture(scope="session")
-def llm_client_mock(llm_config, mock_api_key):
+def llm_client_mock(llm_config_mock):
     """session：假 api_key，mock 用例共用"""
-    yield _build_llm_client(llm_config, mock_api_key)
+    yield _build_llm_client(llm_config_mock, MOCK_API_KEY)
 
 
 @pytest.fixture
 def llm_client(request):
     """按标记只取一个 session 客户端：real_api、双标记、未打标用真实密钥，仅 mock 用假密钥"""
-    if request.node.get_closest_marker("real_api") is not None or request.node.get_closest_marker("mock") is None:
+    if _use_real_client(request):
         return request.getfixturevalue("llm_client_real")
     return request.getfixturevalue("llm_client_mock")
 
