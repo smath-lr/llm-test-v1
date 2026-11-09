@@ -19,8 +19,9 @@ def load_llm_config():
         raise FileNotFoundError(f"配置文件不存在！路径：{CONFIG_PATH}")
 
     cfg = config["deepseek"]
+    # 在这里判断密钥。缺失或空字符串直接失败，调用方不会拿到配置，也就不会创建客户端或发请求
     api_key = os.getenv("DEEPSEEK_API_KEY")
-    if not api_key:
+    if api_key is None or api_key == "":
         raise ValueError("环境变量 DEEPSEEK_API_KEY 未配置")
     cfg["api_key"] = api_key
     return cfg
