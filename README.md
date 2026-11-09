@@ -102,9 +102,6 @@ python -m pytest -v -m real_api
 | ---- | ---- |
 | `mock` | 使用 mocker 补丁模拟调用 API 接口，非真实网络请求，不消耗 token |
 | `real_api` | 真实调用 LLM 接口，会产生 token 消耗 |
-| `slow` | LLM 长推理，耗时较高的用例 |
-| `llm_stream` | 流式返回 chunk 测试 |
-| `need_retry` | 容易触发 429/504、需要重试逻辑的接口用例 |
 
 ## 测试覆盖范围
 1. **基础冒烟测试**：验证大模型正常返回、基础问答、安全内容拒绝

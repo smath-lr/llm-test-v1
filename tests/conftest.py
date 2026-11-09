@@ -152,6 +152,19 @@ def setup_global_log():
         h.close()
 
 
+def _pop_request_trace(item):
+    """取出本用例的请求次数和按尝试顺序排列的各次耗时，并清空，避免带到下一条用例。"""
+    funcargs = getattr(item, "funcargs", None) or {}
+    client = funcargs.get("llm_client")
+    if client is None:
+        return None, None
+    count = getattr(client, "last_request_count", None)
+    elapsed_ms = getattr(client, "last_request_elapsed_ms", None)
+    client.last_request_count = None
+    client.last_request_elapsed_ms = None
+    return count, elapsed_ms
+
+
 ## ============ 用例执行失败，保存完整json信息 ============
 def save_fail_payload(case_name: str, payload_data: dict, fail_payload_dir: Path) -> str:
     """保存失败用例完整payload，直接传入整个payload字典"""
@@ -189,6 +202,7 @@ def pytest_runtest_makereport(item, call):
     if call.when != "call":
         return
 
+    request_count, request_elapsed_ms = _pop_request_trace(item)
     payload_data = item.stash.get("payload_data", None)
     if not payload_data:
         # 没有payload数据，直接跳过
@@ -203,8 +217,10 @@ def pytest_runtest_makereport(item, call):
     if call.excinfo is not None:
         # 用例失败，保存json文件 + 输出错误日志+堆栈
         case_full_name = item.name
+        payload_data["request_count"] = request_count
+        payload_data["request_elapsed_ms"] = request_elapsed_ms
         json_path = save_fail_payload(case_full_name, payload_data, fail_payload_dir)
-        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}")
+        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}，请求次数：{request_count}，各次请求耗时（按尝试顺序，毫秒）：{request_elapsed_ms}")
         _test_logger.error(f"【用例失败】完整请求响应已保存至：{json_path}")
         tb_str = "".join(traceback.format_exception(call.excinfo.type, call.excinfo.value, call.excinfo.tb))
         _test_logger.error(f"异常堆栈信息：\n{tb_str}")

@@ -235,6 +235,16 @@ class LLMClient:
     def _can_retry(state: RetryCallState) -> bool:
         if state.outcome is None:
             return False
+        # 起点是第一次进入 chat 的 start_time，终点是这一次尝试结束时的 outcome_timestamp。
+        # 第二次及以后是从同一次起点算到本次结束，中间的等待也在里面。
+        if state.args and state.outcome_timestamp is not None:
+            instance = state.args[0]
+            attempt = state.attempt_number
+            elapsed_ms = int((state.outcome_timestamp - state.start_time) * 1000)
+            instance.last_request_count = attempt
+            if attempt == 1 or not isinstance(getattr(instance, "last_request_elapsed_ms", None), list):
+                instance.last_request_elapsed_ms = []
+            instance.last_request_elapsed_ms.append(elapsed_ms)
         exc = state.outcome.exception()
         if exc is None or state.attempt_number >= MAX_ATTEMPTS:
             return False
