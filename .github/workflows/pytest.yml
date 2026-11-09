@@ -13,20 +13,39 @@ jobs:
     # 运行环境 ubuntu-latest 最新版
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       # 检出代码
       - name: Checkout
         uses: actions/checkout@v4
+
       # 设置 Python 版本
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+
       # 安装依赖
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+
       # 运行测试，只跑mock用例
       - name: Run mock tests
-        run: python -m pytest -v -m mock
+        run: |
+          mkdir -p reports
+          python -m pytest -v -m mock \
+            --html=reports/pytest_report.html \
+            --self-contained-html \
+            --junitxml=reports/pytest_report.xml
+
+      # 上传报告
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+          retention-days: 7
+          if-no-files-found: warn
