@@ -28,7 +28,7 @@ llm-test-v1
 │   ├── __init__.py
 │   └── llm_client.py        # LLM 客户端封装（LLMClient.chat，含重试）
 ├── utils/                   # 公共工具，不放被测对象
-│   ├── config_loader.py     # 读取 config.yaml；从 .env 读取密钥，对外只返回打码值 ***
+│   ├── config_loader.py     # 读取 config.yaml；配置里的密钥是 ***，真实请求用 .env 原文
 │   └── log_helper.py        # 日志辅助模块：logger、handler 统一创建与配置
 ├── tests/                   # pytest 测试用例集合
 │   ├── conftest.py                  # pytest 全局钩子、logger fixture、llm_client 实例 fixture、失败报文保存逻辑
@@ -45,7 +45,7 @@ llm-test-v1
 └── .gitignore
 ```
 
-> 重要提示：`allure-results/`、`allure-report/`、`logs/`、`.env` 均配置在 `.gitignore`，不会提交到远端仓库。API 密钥原文只放在 `.env`。`load_llm_config()` 对外返回的 `api_key` 是打码值 `***`。`config/config.yaml` 只放地址、模型、超时、temperature、max_tokens 等非密钥配置。`doc/allure_report.png` 为手动保存的报告截图，用于项目展示，可以提交 git。
+> 重要提示：`allure-results/`、`allure-report/`、`logs/`、`.env` 均配置在 `.gitignore`，不会提交到远端仓库。API 密钥原文只放在 `.env`，并只交给真实请求的客户端。`load_llm_config()` 返回的 `api_key` 是打码值 `***`。`config/config.yaml` 只放地址、模型、超时、temperature、max_tokens 等非密钥配置。`doc/allure_report.png` 为手动保存的报告截图，用于项目展示，可以提交 git。
 
 文档分工：`doc/LLM_API客户端测试计划.md` 写目标、范围、优先级、风险、验收和排期；`doc/LLM_API客户端测试设计.md` 写参数、固定值和重试规则；`doc/LLM_API客户端chat接口测试用例.md` 写可执行用例和断言。
 
@@ -111,7 +111,7 @@ python -m pytest -v -m real_api
 2. **请求参数**：单轮、多轮 `messages` 按预期传递。默认参数来自配置。调用时可以改写 `model`、`temperature`、`max_tokens`、`timeout`。
 3. **响应解析**：正常文本原样返回。没有 `choices`、`choices` 不是列表、空 `choices`、缺少 `message` 或 `content`、`content` 为空字符串、纯空白或不是字符串时抛出异常，并且不重试。
 4. **重试**：429 带可解析的 Retry-After、500 的临时故障码会重试，最多 3 次，并受 25 秒预算约束；预算不足则停止。502/504 走抖动，503 优先用 Retry-After。连接重试只认 `APIConnectionError` 本身；`APITimeoutError` 和 DNS 失败不重试。
-5. **真实 API 冒烟**（`tests/test-src/test_real_api_smoke.py`）：打码密钥透传（请求头为 `Bearer ***`，配置中的 `api_key` 为 `***`）；单轮「23乘45等于多少」，回答含「1035」；多轮把 good morning 翻译成中文，回答含「早上好」；密钥缺失或空字符串在加载配置时拦住。不测有害提问。
+5. **真实 API 冒烟**（`tests/test-src/test_real_api_smoke.py`）：配置中的 `api_key` 为 `***`，请求头携带 `.env` 原文；单轮「23乘45等于多少」，回答含「1035」；多轮把 good morning 翻译成中文，回答含「早上好」；密钥缺失或空字符串在加载配置时拦住。不测有害提问。
 6. **Mock**：输入校验、请求透传、重试与不重试、响应解析，基于 `pytest-mock`，不联网、不消耗 token。
 
 ## Allure测试报告
