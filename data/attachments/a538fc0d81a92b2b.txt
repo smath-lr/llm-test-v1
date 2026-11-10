@@ -1,4 +1,0 @@
-2026-11-10 11:54:10,171 | INFO | test_run | 【测试用例开始】用例名称：test_mock_chat_response_missing_content
-2026-11-10 11:54:10,173 | INFO | llm_business | 收到prompt，长度=11
-2026-11-10 11:54:10,173 | ERROR | llm_business | 响应缺少content
-2026-11-10 11:54:10,173 | INFO | test_run | 【用例执行成功（捕获预期异常）】用例名称：test_mock_chat_response_missing_content, prompt长度:11, messages长度:None, 返回长度:0, 捕获异常：RuntimeError

@@ -1,0 +1,4 @@
+2026-11-10 12:08:23,481 | INFO | test_run | 【测试用例开始】用例名称：test_mock_chat_override_request_params[\u8986\u76d6\u5168\u90e8\u8bf7\u6c42\u53c2\u6570-overrides5]
+2026-11-10 12:08:23,483 | INFO | llm_business | 收到prompt，长度=10
+2026-11-10 12:08:23,483 | INFO | llm_business | API 调用成功
+2026-11-10 12:08:23,483 | INFO | test_run | 【用例执行成功】用例名称：test_mock_chat_override_request_params[\u8986\u76d6\u5168\u90e8\u8bf7\u6c42\u53c2\u6570-overrides5]，prompt长度：10，messages长度：None，返回长度：8
