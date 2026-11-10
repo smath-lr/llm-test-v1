@@ -127,7 +127,7 @@ python -m pytest -v -m real_api
 2. **请求参数**：单轮、多轮 `messages` 按预期传递。默认参数来自配置。调用时可以改写 `model`、`temperature`、`max_tokens`、`timeout`。
 3. **响应解析**：正常文本原样返回。没有 `choices`、`choices` 不是列表、空 `choices`、缺少 `message` 或 `content`、`content` 为空字符串、纯空白或不是字符串时抛出异常，并且不重试。
 4. **重试**：429 带可解析的 Retry-After、500 的临时故障码会重试，最多 3 次，并受 25 秒预算约束；预算不足则停止。502/504 走抖动，503 优先用 Retry-After。连接重试只认 `APIConnectionError` 本身；`APITimeoutError` 和 DNS 失败不重试。
-5. **真实 API 冒烟**（`tests/test-src/test_real_api_smoke.py`）：配置中的 `api_key` 为 `*`**，请求头携带 `.env` 原文；单轮「23乘45等于多少」，回答含「1035」；多轮把 good morning 翻译成中文，回答含「早上好」；密钥缺失或空字符串在加载配置时拦住。不测有害提问。
+5. **真实 API 冒烟**（`tests/test-src/test_real_api_smoke.py`）：配置中的 `api_key` 为 `***`，请求头携带 `.env` 原文；单轮「23乘45等于多少」，回答含「1035」；多轮把 good morning 翻译成中文，回答含「早上好」；密钥缺失或空字符串在加载配置时拦住。不测有害提问。
 6. **Mock**：输入校验、请求透传、重试与不重试、响应解析，基于 `pytest-mock`，不联网、不消耗 token。
 
 ## Allure测试报告
