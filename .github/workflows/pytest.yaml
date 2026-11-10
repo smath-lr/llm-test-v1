@@ -31,14 +31,31 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      # 运行测试，只跑mock用例
-      - name: Run mock tests
+      # 运行测试，只跑mock用例,并生成 html report + allure results
+      - name: Run mock tests and generate html report + allure results
         run: |
           mkdir -p reports
           python -m pytest -v -m mock \
             --html=reports/pytest_report.html \
             --self-contained-html \
             --alluredir=reports/allure-results
+
+      # 生成 allure report
+      - name: Generate allure report
+        uses: allure-framework/allure-github-action@v2
+        with:
+          version: 2.23.1
+          results_dir: reports/allure-results
+          report_dir: reports/allure-report
+          clean: true
+
+      # 部署 allure report 到 GitHub Pages
+      - name: Deploy Allure report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports/allure-report
+          publish_branch: gh-pages
 
       # 上传报告
       - name: Upload test reports
