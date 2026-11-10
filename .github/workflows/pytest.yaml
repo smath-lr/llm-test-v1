@@ -43,12 +43,14 @@ jobs:
             --self-contained-html \
             --alluredir=reports/allure-results
 
-      # 生成 allure report
+      # 生成 allure report。afiore 依赖已下架的 openjdk:8-jre-alpine，改用仍在维护的 action。
       - name: Generate allure report
-        uses: afiore/action-allure-report@v0.1.0
+        uses: simple-elf/allure-report-action@v1.15
         with:
-          results-dir: reports/allure-results
-          report-dir: reports/allure-report
+          allure_results: reports/allure-results
+          allure_report: reports/allure-report
+          gh_pages: reports/gh-pages
+          allure_history: reports/allure-history
 
       # 部署 allure report 到 GitHub Pages
       - name: Deploy Allure report to GitHub Pages
