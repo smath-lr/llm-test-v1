@@ -43,6 +43,7 @@ def test_tc090_multi_turn_translation(llm_client, record_payload):
     assert "早上好" in result
 
 
+@pytest.mark.real_api
 @pytest.mark.parametrize("api_key", [None, ""], ids=["缺失", "空字符串"])
 def test_tc091_api_key_missing_or_empty(monkeypatch, api_key):
     """TC-091：加载配置时密钥缺失或为空，不创建客户端，不发请求。"""
