@@ -1,6 +1,0 @@
-# config/config.example.yaml
-deepseek:
-  api_key: ""
-  base_url: "https://api.deepseek.com"
-  model: "deepseek-chat"
-  timeout: 15

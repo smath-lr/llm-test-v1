@@ -4,9 +4,10 @@ import pytest
 from pathlib import Path
 import time
 import json
-from config.config_loader import load_llm_config
+import yaml
+from utils.config_loader import MASKED_API_KEY, load_llm_config, read_api_key
 from utils import log_helper
-from utils.llm_client import LLMClient
+from src.llm_client import LLMClient
 
 
 # 开启：logging内部handler发生IO错误时抛出异常，不要静默吞掉
@@ -16,30 +17,122 @@ _printed_modules = set()
 # 失败用例信息的目录
 BASE_DIR = Path(__file__).parent.parent          # 项目根目录
 FAIL_PAYLOAD_DIR = BASE_DIR / "logs" / "fail_payload"
+# mock 用例共用的假密钥，其它文件引用这个变量，不直接写字符串
+MOCK_API_KEY = "sk-mock"
+
+
+def _build_llm_client(cfg, api_key):
+    return LLMClient(
+        api_key=api_key,
+        base_url=cfg["base_url"],
+        model=cfg["model"],
+        timeout=cfg["timeout"],
+        temperature=cfg["temperature"],
+        max_tokens=cfg["max_tokens"],
+    )
 
 
 @pytest.fixture
 def valid_prompt():
     """fixture：复用的合法prompt，所有用例可以直接调用"""
     return "简单介绍自动化测试"
-@pytest.fixture
-def max_length_prompt():
-    """fixture：刚好达到上限长度prompt"""
-    return "a"*200
+
+
+def _use_real_client(request):
+    return request.node.get_closest_marker("real_api") is not None or request.node.get_closest_marker("mock") is None
 
 
 @pytest.fixture(scope="session")
-def llm_client():
-    # session：整个测试会话只初始化一次，所有用例共用同一个client实例
-    cfg = load_llm_config()
-    client = LLMClient(
-        api_key=cfg["api_key"],
-        base_url=cfg["base_url"],
-        model=cfg["model"],
-        timeout=cfg["timeout"]
-    )
-    yield client
-    # yield后面可以写后置：关闭连接、清理资源
+def llm_config_real():
+    """session：真实配置。load_llm_config 会校验密钥，返回值里的 api_key 仍是打码值。"""
+    return load_llm_config()
+
+
+@pytest.fixture(scope="session")
+def llm_config_mock():
+    """session：只读 yaml，不读密钥。api_key 填打码值。"""
+    config_path = BASE_DIR / "config" / "config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    cfg = config["deepseek"]
+    cfg["api_key"] = MASKED_API_KEY
+    return cfg
+
+
+@pytest.fixture
+def llm_config(request):
+    """按标记只取一份 session 配置：real_api、双标记、未打标走真实配置，仅 mock 走 yaml。"""
+    if _use_real_client(request):
+        return request.getfixturevalue("llm_config_real")
+    return request.getfixturevalue("llm_config_mock")
+
+
+@pytest.fixture(scope="session")
+def llm_client_real(llm_config_real):
+    """session：真实 api_key，real_api 用例共用。配置字典里仍是打码值。"""
+    yield _build_llm_client(llm_config_real, read_api_key())
+
+
+@pytest.fixture(scope="session")
+def llm_client_mock(llm_config_mock):
+    """session：假 api_key，mock 用例共用"""
+    yield _build_llm_client(llm_config_mock, MOCK_API_KEY)
+
+
+@pytest.fixture
+def llm_client(request):
+    """按标记只取一个 session 客户端：real_api、双标记、未打标用真实密钥，仅 mock 用假密钥"""
+    if _use_real_client(request):
+        return request.getfixturevalue("llm_client_real")
+    return request.getfixturevalue("llm_client_mock")
+
+
+def _measured_prompt_len(prompt):
+    """只记字符串的字符数。不是字符串记 None。"""
+    if isinstance(prompt, str):
+        return len(prompt)
+    return None
+
+
+def _measured_messages_len(messages):
+    """只记消息列表里每条 user 内容的字符数。没传或不是消息列表记 None。"""
+    if isinstance(messages, list) and all(isinstance(item, dict) for item in messages):
+        return [
+            len(item["content"])
+            for item in messages
+            if item.get("role") == "user" and isinstance(item.get("content"), str)
+        ]
+    return None
+
+
+def _measured_response_len(response):
+    """只记回复是字符串的字符数。没有回复记 0。"""
+    if isinstance(response, str):
+        return len(response)
+    return 0
+
+
+@pytest.fixture
+def record_payload(request):
+    """把本次调用的 prompt、messages、回复交给 makereport。长度在这里计算，用例只传原始值。"""
+
+    def _record(prompt=None, response=None, exc=None, messages=None, **extra):
+        prompt_len = extra.pop("prompt_len") if "prompt_len" in extra else _measured_prompt_len(prompt)
+        messages_len = extra.pop("messages_len") if "messages_len" in extra else _measured_messages_len(messages)
+        payload = {
+            **extra,
+            "prompt": prompt,
+            "prompt_len": prompt_len,
+            "messages": messages,
+            "messages_len": messages_len,
+            "response": response,
+            "response_len": _measured_response_len(response),
+        }
+        if exc:
+            payload["expected_exception"] = exc
+        request.node.stash["payload_data"] = payload
+
+    return _record
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -71,6 +164,19 @@ def setup_global_log():
     for h in test_handlers:
         test_run_logger.removeHandler(h)
         h.close()
+
+
+def _pop_request_trace(item):
+    """取出本用例的请求次数和按尝试顺序排列的各次耗时，并清空，避免带到下一条用例。"""
+    funcargs = getattr(item, "funcargs", None) or {}
+    client = funcargs.get("llm_client")
+    if client is None:
+        return None, None
+    count = getattr(client, "last_request_count", None)
+    elapsed_ms = getattr(client, "last_request_elapsed_ms", None)
+    client.last_request_count = None
+    client.last_request_elapsed_ms = None
+    return count, elapsed_ms
 
 
 ## ============ 用例执行失败，保存完整json信息 ============
@@ -110,27 +216,31 @@ def pytest_runtest_makereport(item, call):
     if call.when != "call":
         return
 
+    request_count, request_elapsed_ms = _pop_request_trace(item)
     payload_data = item.stash.get("payload_data", None)
     if not payload_data:
         # 没有payload数据，直接跳过
         return
     _test_logger = logging.getLogger("test_run")
     fail_payload_dir = FAIL_PAYLOAD_DIR
-    prompt_len = payload_data["prompt_len"]
-    resp_len = payload_data["response_len"]
+    prompt_len = payload_data.get("prompt_len")
+    messages_len = payload_data.get("messages_len")
+    resp_len = payload_data.get("response_len")
     expected_exception = payload_data.get("expected_exception", "")
 
     if call.excinfo is not None:
         # 用例失败，保存json文件 + 输出错误日志+堆栈
         case_full_name = item.name
+        payload_data["request_count"] = request_count
+        payload_data["request_elapsed_ms"] = request_elapsed_ms
         json_path = save_fail_payload(case_full_name, payload_data, fail_payload_dir)
-        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
+        _test_logger.error(f"【用例失败】用例名称：{case_full_name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}，请求次数：{request_count}，各次请求耗时（按尝试顺序，毫秒）：{request_elapsed_ms}")
         _test_logger.error(f"【用例失败】完整请求响应已保存至：{json_path}")
         tb_str = "".join(traceback.format_exception(call.excinfo.type, call.excinfo.value, call.excinfo.tb))
         _test_logger.error(f"异常堆栈信息：\n{tb_str}")
     else:
         # 用例成功：区分普通成功 / 捕获预期异常成功
         if not expected_exception:
-            _test_logger.info(f"【用例执行成功】用例名称：{item.name}，prompt长度：{prompt_len}，返回长度：{resp_len}")
+            _test_logger.info(f"【用例执行成功】用例名称：{item.name}，prompt长度：{prompt_len}，messages长度：{messages_len}，返回长度：{resp_len}")
         else:
-            _test_logger.info(f"【用例执行成功（捕获预期异常）】用例名称：{item.name}, prompt长度:{prompt_len}, 返回长度:{resp_len}, 捕获异常：{expected_exception}")
+            _test_logger.info(f"【用例执行成功（捕获预期异常）】用例名称：{item.name}, prompt长度:{prompt_len}, messages长度:{messages_len}, 返回长度:{resp_len}, 捕获异常：{expected_exception}")

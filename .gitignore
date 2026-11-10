@@ -1,5 +1,6 @@
-# 密钥配置文件
-config/config.yaml
+# 本地环境变量（存放密钥，禁止提交仓库）
+.env
+*.env
 
 # 日志目录（包含fail_payload下的json失败报文）
 logs/
@@ -14,6 +15,9 @@ __pycache__/
 
 # VSCode编辑器本地配置
 .vscode/
+
+# Cursor本地配置与计划
+.cursor/
 
 # 报告产物
 allure-report/

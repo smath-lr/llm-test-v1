@@ -1,0 +1,6 @@
+deepseek:
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-flash"
+  timeout: 15
+  temperature: 0.7
+  max_tokens: 500
