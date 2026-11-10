@@ -38,7 +38,7 @@ jobs:
           python -m pytest -v -m mock \
             --html=reports/pytest_report.html \
             --self-contained-html \
-            --junitxml=reports/pytest_report.xml
+            --alluredir=reports/allure-results
 
       # 上传报告
       - name: Upload test reports
