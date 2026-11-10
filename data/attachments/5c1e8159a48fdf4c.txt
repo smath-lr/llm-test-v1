@@ -1,3 +1,0 @@
-2026-11-10 12:18:16,656 | INFO | test_run | 【测试用例开始】用例名称：test_mock_chat_prompt_length[\u4e00\u6761messages\u7684user\u5185\u5bb9\u957f\u5ea6201-None-messages5-201]
-2026-11-10 12:18:16,657 | ERROR | llm_business | 参数校验失败：prompt 超长，长度=201
-2026-11-10 12:18:16,657 | INFO | test_run | 【用例执行成功（捕获预期异常）】用例名称：test_mock_chat_prompt_length[\u4e00\u6761messages\u7684user\u5185\u5bb9\u957f\u5ea6201-None-messages5-201], prompt长度:None, messages长度:201, 返回长度:0, 捕获异常：^prompt长度不能超过

@@ -1,3 +1,0 @@
-2026-11-10 12:18:16,594 | INFO | test_run | 【测试用例开始】用例名称：test_mock_chat_prompt_structure_invalid[None-messages9-\u7b2c1\u6761message\u7f3a\u5c11role]
-2026-11-10 12:18:16,595 | ERROR | llm_business | 参数校验失败：第1条message缺少role
-2026-11-10 12:18:16,595 | INFO | test_run | 【用例执行成功（捕获预期异常）】用例名称：test_mock_chat_prompt_structure_invalid[None-messages9-\u7b2c1\u6761message\u7f3a\u5c11role], prompt长度:None, messages长度:[], 返回长度:0, 捕获异常：ValueError

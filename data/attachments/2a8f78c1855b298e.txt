@@ -1,0 +1,3 @@
+2026-11-10 13:08:51,717 | INFO | test_run | 【测试用例开始】用例名称：test_mock_chat_prompt_structure_invalid[-None-prompt\u4e0d\u80fd\u4e3a\u7a7a]
+2026-11-10 13:08:51,719 | ERROR | llm_business | 参数校验失败：prompt 为 空字符串
+2026-11-10 13:08:51,719 | INFO | test_run | 【用例执行成功（捕获预期异常）】用例名称：test_mock_chat_prompt_structure_invalid[-None-prompt\u4e0d\u80fd\u4e3a\u7a7a], prompt长度:0, messages长度:None, 返回长度:0, 捕获异常：ValueError
