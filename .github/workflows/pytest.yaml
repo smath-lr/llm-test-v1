@@ -43,12 +43,12 @@ jobs:
             --self-contained-html \
             --alluredir=reports/allure-results
 
-      # 生成 allure report。原先的 GitHub Action 仓库已不存在，改为官方命令行。
+      # 生成 allure report
       - name: Generate allure report
-        run: |
-          curl -fsSL -o allure.tgz https://github.com/allure-framework/allure2/releases/download/2.23.1/allure-2.23.1.tgz
-          tar -xzf allure.tgz
-          ./allure-2.23.1/bin/allure generate reports/allure-results -o reports/allure-report --clean
+        uses: afiore/action-allure-report@v0.1.0
+        with:
+          results-dir: reports/allure-results
+          report-dir: reports/allure-report
 
       # 部署 allure report 到 GitHub Pages
       - name: Deploy Allure report to GitHub Pages
